@@ -417,51 +417,14 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                 </div>
               </div>
 
-              {/* القسمان: النظامي | المبكر */}
+              {/* القسمان: المبكر | النظامي */}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
 
-                {/* ── النصف الأيمن: التقاعد النظامي ── */}
-                <div style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${gold}30`}}>
-                  <div style={{background:`linear-gradient(135deg,${gold2},${gold})`,padding:'8px 10px',textAlign:'center'}}>
-                    <div style={{fontSize:10,fontWeight:800,color:'#fff'}}>🏛 التقاعد النظامي</div>
-                  </div>
-                  {/* البيانات */}
-                  <div style={{background:goldL,padding:'10px',textAlign:'center',borderBottom:`1px solid ${gold}20`}}>
-                    <div style={{fontSize:8,color:txt2,marginBottom:2}}>سن التقاعد</div>
-                    <div style={{fontSize:17,fontWeight:900,color:gold2,lineHeight:1}}>{ri.lb}</div>
-                    {ri.dt&&<div style={{fontSize:8,color:txt2,marginTop:3}}>{ri.dt.toLocaleDateString('ar-SA')}</div>}
-                  </div>
-                  {/* جدول RA */}
-                  {!ri.ex&&(
-                    <div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#F1F5F9',padding:'3px 8px',borderBottom:`1px solid ${brd}`}}>
-                        {['نطاق العمر هـ','سن التقاعد'].map((h,i)=>(
-                          <div key={i} style={{fontSize:7,fontWeight:700,color:txt2,textAlign:'center'}}>{h}</div>
-                        ))}
-                      </div>
-                      {raSlice.map((r,i)=>{
-                        const isMe=r===myRA;
-                        return(
-                          <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr',padding:'5px 8px',background:isMe?goldL:i%2===0?bg2:bg,borderBottom:`1px solid ${brd}`,position:'relative'}}>
-                            {isMe&&<div style={{position:'absolute',right:0,top:0,bottom:0,width:3,background:gold}}/>}
-                            <div style={{fontSize:isMe?10:8,fontWeight:isMe?800:400,color:isMe?gold2:txt,textAlign:'center'}}>
-                              {r.mx?`${r.mn}–${r.mx}`:`${r.mn}+`}
-                              {isMe&&<div style={{fontSize:7,color:gold,fontWeight:700}}>← أنت</div>}
-                            </div>
-                            <div style={{fontSize:isMe?10:8,fontWeight:isMe?800:400,color:isMe?gold2:txt,textAlign:'center'}}>{r.rY}س{r.rM>0?` ${r.rM}م`:''}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── النصف الأيسر: التقاعد المبكر ── */}
+                {/* ── النصف الأيمن: التقاعد المبكر ── */}
                 <div style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${earlyDone?grn:red}30`}}>
                   <div style={{background:`linear-gradient(135deg,${earlyDone?'#065F46':'#991B1B'},${earlyDone?grn:red})`,padding:'8px 10px',textAlign:'center'}}>
                     <div style={{fontSize:10,fontWeight:800,color:'#fff'}}>⚡ التقاعد المبكر</div>
                   </div>
-                  {/* البيانات */}
                   <div style={{background:earlyDone?grnL:redL,padding:'10px',textAlign:'center',borderBottom:`1px solid ${earlyDone?grn:red}20`}}>
                     <div style={{fontSize:8,color:txt2,marginBottom:2}}>المطلوب</div>
                     <div style={{fontSize:17,fontWeight:900,color:earlyDone?grn:red,lineHeight:1}}>{ri.eR} شهر</div>
@@ -470,7 +433,6 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                       {earlyDone?`✓ مؤهل — ${psAtRF.tM} شهر`:`متبقٍ ${earlyLeft} شهر`}
                     </div>}
                   </div>
-                  {/* جدول ET */}
                   {!ri.ex&&(
                     <div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#F1F5F9',padding:'3px 8px',borderBottom:`1px solid ${brd}`}}>
@@ -488,6 +450,40 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                               {isMe&&<div style={{fontSize:7,color:grn,fontWeight:700}}>← أنت</div>}
                             </div>
                             <div style={{fontSize:isMe?10:8,fontWeight:isMe?800:400,color:isMe?grn:txt,textAlign:'center'}}>{r.req}ش ({r.y}س)</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── النصف الأيسر: التقاعد النظامي ── */}
+                <div style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${gold}30`}}>
+                  <div style={{background:`linear-gradient(135deg,${gold2},${gold})`,padding:'8px 10px',textAlign:'center'}}>
+                    <div style={{fontSize:10,fontWeight:800,color:'#fff'}}>🏛 التقاعد النظامي</div>
+                  </div>
+                  <div style={{background:goldL,padding:'10px',textAlign:'center',borderBottom:`1px solid ${gold}20`}}>
+                    <div style={{fontSize:8,color:txt2,marginBottom:2}}>سن التقاعد</div>
+                    <div style={{fontSize:17,fontWeight:900,color:gold2,lineHeight:1}}>{ri.lb}</div>
+                    {ri.dt&&<div style={{fontSize:8,color:txt2,marginTop:3}}>{ri.dt.toLocaleDateString('ar-SA')}</div>}
+                  </div>
+                  {!ri.ex&&(
+                    <div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',background:'#F1F5F9',padding:'3px 8px',borderBottom:`1px solid ${brd}`}}>
+                        {['نطاق العمر هـ','سن التقاعد'].map((h,i)=>(
+                          <div key={i} style={{fontSize:7,fontWeight:700,color:txt2,textAlign:'center'}}>{h}</div>
+                        ))}
+                      </div>
+                      {raSlice.map((r,i)=>{
+                        const isMe=r===myRA;
+                        return(
+                          <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr',padding:'5px 8px',background:isMe?goldL:i%2===0?bg2:bg,borderBottom:`1px solid ${brd}`,position:'relative'}}>
+                            {isMe&&<div style={{position:'absolute',right:0,top:0,bottom:0,width:3,background:gold}}/>}
+                            <div style={{fontSize:isMe?10:8,fontWeight:isMe?800:400,color:isMe?gold2:txt,textAlign:'center'}}>
+                              {r.mx?`${r.mn}–${r.mx}`:`${r.mn}+`}
+                              {isMe&&<div style={{fontSize:7,color:gold,fontWeight:700}}>← أنت</div>}
+                            </div>
+                            <div style={{fontSize:isMe?10:8,fontWeight:isMe?800:400,color:isMe?gold2:txt,textAlign:'center'}}>{r.rY}س{r.rM>0?` ${r.rM}م`:''}</div>
                           </div>
                         );
                       })}
