@@ -389,24 +389,91 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
             :<><input type="date" value={info.bd} onChange={e=>{const bd=e.target.value;setInfo(p=>({...p,bd}));if(info.rd&&bd){const a=ageAt(bd,info.rd);setRetAge(a.g>0?String(a.g):'')}}} style={{...inp,direction:'ltr',textAlign:'center'}}/>
               {info.bd&&<div style={{fontSize:9,color:gold,marginTop:3,textAlign:'center'}}>{fmtHijri(info.bd)}</div>}</>
           }
-          {info.bd&&<div style={{marginTop:6}}>
-            <div style={{fontSize:13,fontWeight:700,color:gold2,textAlign:'center'}}>
-              العمر الحالي: {age(info.bd).g} م / {age(info.bd).h} هـ
-            </div>
-            <div style={{fontSize:10,color:ri.ex?grn:txt2,textAlign:'center',marginTop:2}}>
-              {ri.ex?'✓ غير مشمول بتعديلات 2024 — النظام القديم':'السن النظامي للتقاعد: '+ri.lb}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginTop:7}}>
-              <div style={{background:bg,borderRadius:9,padding:'5px 8px',border:`1px solid ${brd}`,textAlign:'center'}}>
-                <div style={{fontSize:8,color:txt2}}>سن التقاعد النظامي</div>
-                <div style={{fontSize:11,fontWeight:700,color:gold2}}>{ri.lb}</div>
+          {info.bd&&(()=>{
+            const aH=ri.aR;
+            // إيجاد السطر الخاص بالمستخدم في جدول RA
+            const myRA=RA.find(r=>aH>=(r.mn||0)&&(!r.mx||aH<r.mx))||RA[RA.length-1];
+            // السطور المجاورة للسياق (قبله وبعده)
+            const myIdx=RA.indexOf(myRA);
+            const raSlice=RA.slice(Math.max(0,myIdx-1),Math.min(RA.length,myIdx+3));
+            // السطر الخاص بالمستخدم في جدول ET
+            const myET=ET.find(r=>psAtRF.tM>=r.mnM&&(!r.mxM||psAtRF.tM<=r.mxM))||ET[ET.length-1];
+            return(
+            <div style={{marginTop:8}}>
+
+              {/* العمر */}
+              <div style={{textAlign:'center',marginBottom:10}}>
+                <div style={{fontSize:22,fontWeight:900,color:gold2,lineHeight:1}}>{age(info.bd).g} <span style={{fontSize:13,fontWeight:500,color:txt2}}>سنة ميلادية</span></div>
+                <div style={{fontSize:12,color:txt2,marginTop:3}}>{age(info.bd).h} سنة هجرية</div>
               </div>
-              <div style={{background:bg,borderRadius:9,padding:'5px 8px',border:`1px solid ${brd}`,textAlign:'center'}}>
-                <div style={{fontSize:8,color:txt2}}>الخدمة للتقاعد المبكر</div>
-                <div style={{fontSize:11,fontWeight:700,color:gold2}}>{ri.eR} شهر ({ri.eY} سنة)</div>
+
+              {/* بنر التصنيف */}
+              <div style={{background:ri.ex?grnL:goldL,border:`1px solid ${ri.ex?grn:org}30`,borderRadius:12,padding:'10px 14px',marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{ri.ex?'✅':'📋'}</span>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:800,color:ri.ex?grn:gold2,marginBottom:3}}>
+                      {ri.ex?'غير مشمول بتعديلات 2024':'مشمول بتعديلات 2024'}
+                    </div>
+                    <div style={{fontSize:10,color:txt2,lineHeight:1.7}}>
+                      {ri.ex
+                        ?'عمرك تجاوز 48.5 سنة هجرية أو خدمتك 240 شهر+ في تاريخ 3/7/2024 — يسري عليك النظام القديم بسن تقاعد 60 سنة هجرية والمبكر عند 300 شهر.'
+                        :`عمرك في 3/7/2024 كان ${ri.aRH.yrs} سنة${ri.aRH.mths>0?` و ${ri.aRH.mths} شهر`:''} هجري — تنطبق عليك التعديلات التدريجية لقرار مجلس الوزراء.`
+                      }
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>}
+
+              {/* بطاقتان: سن التقاعد + المبكر */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginBottom:10}}>
+                <div style={{background:goldL,borderRadius:11,padding:'10px 12px',border:`1px solid ${gold}25`,textAlign:'center'}}>
+                  <div style={{fontSize:9,color:txt2,marginBottom:3}}>سن التقاعد النظامي</div>
+                  <div style={{fontSize:16,fontWeight:900,color:gold2,lineHeight:1}}>{ri.lb}</div>
+                  {ri.dt&&<div style={{fontSize:8,color:txt2,marginTop:3}}>{ri.dt.toLocaleDateString('ar-SA')}</div>}
+                </div>
+                <div style={{background:ri.eR<=psAtRF.tM?grnL:redL,borderRadius:11,padding:'10px 12px',border:`1px solid ${ri.eR<=psAtRF.tM?grn:red}25`,textAlign:'center'}}>
+                  <div style={{fontSize:9,color:txt2,marginBottom:3}}>التقاعد المبكر يستلزم</div>
+                  <div style={{fontSize:16,fontWeight:900,color:ri.eR<=psAtRF.tM?grn:red,lineHeight:1}}>{ri.eR} شهر</div>
+                  <div style={{fontSize:9,color:txt2,marginTop:2}}>{ri.eY} سنة خدمة</div>
+                </div>
+              </div>
+
+              {/* جدول التعديلات التدريجية */}
+              {!ri.ex&&(
+                <div style={{borderRadius:12,overflow:'hidden',border:`1px solid ${brd}`,marginBottom:4}}>
+                  <div style={{background:gold2,padding:'7px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:10,fontWeight:700,color:'#fff'}}>جدول التعديلات — قرار 3/7/2024</span>
+                    <span style={{fontSize:8,color:'rgba(255,255,255,0.7)'}}>حسب العمر الهجري في 3/7/2024</span>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#F8FAFC',padding:'4px 10px',borderBottom:`1px solid ${brd}`}}>
+                    {['نطاق العمر هـ','سن التقاعد','المبكر (شهر)'].map((h,i)=>(
+                      <div key={i} style={{fontSize:8,fontWeight:700,color:txt2,textAlign:'center'}}>{h}</div>
+                    ))}
+                  </div>
+                  {raSlice.map((r,i)=>{
+                    const isMe=r===myRA;
+                    const etRow=ET.find(e=>{ const eqR=r.rY*12+r.rM; return eqR>=(e.mnM||0)&&(!e.mxM||eqR<=e.mxM) })||myET;
+                    return(
+                      <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'6px 10px',background:isMe?goldL:i%2===0?bg2:bg,borderBottom:`1px solid ${brd}`,border:isMe?`2px solid ${gold}`:undefined,position:'relative'}}>
+                        {isMe&&<div style={{position:'absolute',right:0,top:0,bottom:0,width:3,background:gold,borderRadius:'0 2px 2px 0'}}/>}
+                        <div style={{fontSize:isMe?11:9,fontWeight:isMe?800:500,color:isMe?gold2:txt,textAlign:'center'}}>
+                          {r.mx?`${r.mn}–${r.mx}`:`${r.mn}+`} سنة
+                          {isMe&&<span style={{display:'block',fontSize:8,color:gold,fontWeight:700}}>← أنت هنا</span>}
+                        </div>
+                        <div style={{fontSize:isMe?11:9,fontWeight:isMe?800:500,color:isMe?gold2:txt,textAlign:'center'}}>{r.rY} سنة{r.rM>0?` ${r.rM}م`:''}</div>
+                        <div style={{fontSize:isMe?11:9,fontWeight:isMe?800:500,color:isMe?gold2:txt,textAlign:'center'}}>{myET.req}</div>
+                      </div>
+                    );
+                  })}
+                  <div style={{padding:'5px 10px',background:'#F8FAFC',fontSize:8,color:txt2,textAlign:'center'}}>
+                    يعرض السطور الأقرب لعمرك — للجدول الكامل راجع صفحة الوضع التأميني
+                  </div>
+                </div>
+              )}
+
+            </div>);
+          })()}
         </div>
 
         {/* تاريخ التقاعد */}
