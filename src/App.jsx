@@ -389,9 +389,23 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
             :<><input type="date" value={info.bd} onChange={e=>{const bd=e.target.value;setInfo(p=>({...p,bd}));if(info.rd&&bd){const a=ageAt(bd,info.rd);setRetAge(a.g>0?String(a.g):'')}}} style={{...inp,direction:'ltr',textAlign:'center'}}/>
               {info.bd&&<div style={{fontSize:9,color:gold,marginTop:3,textAlign:'center'}}>{fmtHijri(info.bd)}</div>}</>
           }
-          {info.bd&&<div style={{fontSize:9,color:txt2,marginTop:4,textAlign:'center'}}>
-            العمر الحالي: <strong style={{color:gold2}}>{age(info.bd).g} م / {age(info.bd).h} هـ</strong>
-            {ri.ex?<span style={{color:grn,marginRight:8}}>✓ غير مشمول</span>:<span style={{marginRight:8}}>السن النظامي: <strong style={{color:gold}}>{ri.lb}</strong></span>}
+          {info.bd&&<div style={{marginTop:6}}>
+            <div style={{fontSize:13,fontWeight:700,color:gold2,textAlign:'center'}}>
+              العمر الحالي: {age(info.bd).g} م / {age(info.bd).h} هـ
+            </div>
+            <div style={{fontSize:10,color:ri.ex?grn:txt2,textAlign:'center',marginTop:2}}>
+              {ri.ex?'✓ غير مشمول بتعديلات 2024 — النظام القديم':'السن النظامي للتقاعد: '+ri.lb}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginTop:7}}>
+              <div style={{background:bg,borderRadius:9,padding:'5px 8px',border:`1px solid ${brd}`,textAlign:'center'}}>
+                <div style={{fontSize:8,color:txt2}}>سن التقاعد النظامي</div>
+                <div style={{fontSize:11,fontWeight:700,color:gold2}}>{ri.lb}</div>
+              </div>
+              <div style={{background:bg,borderRadius:9,padding:'5px 8px',border:`1px solid ${brd}`,textAlign:'center'}}>
+                <div style={{fontSize:8,color:txt2}}>الخدمة للتقاعد المبكر</div>
+                <div style={{fontSize:11,fontWeight:700,color:gold2}}>{ri.eR} شهر ({ri.eY} سنة)</div>
+              </div>
+            </div>
           </div>}
         </div>
 
@@ -531,12 +545,12 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           💡 <strong>لماذا مهمة؟</strong> متوسط أجور آخر 24 شهر هو الأساس في حساب معاشك. أدخلها بدقة للحصول على نتيجة صحيحة. يمكنك تعبئتها تلقائياً بآخر أجر مدخل في المدد.
         </div>
         <button onClick={()=>setSals(s24.map(()=>ps.lS||0))} style={{padding:'7px 12px',borderRadius:10,border:`1px solid ${pur}`,background:purL,color:pur,fontWeight:700,fontSize:10,cursor:'pointer',fontFamily:'inherit',marginBottom:8}}>تعبئة بآخر أجر — {fI(ps.lS)} ر.س</button>
-        <div style={{borderRadius:12,border:`1px solid ${brd}`,overflow:'hidden',maxHeight:400,overflowY:'auto'}}>
+        <div style={{borderRadius:12,border:`1px solid ${brd}`,overflow:'hidden',maxHeight:340,overflowY:'auto'}}>
           {s24.map((l,i)=>(
-            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr auto auto',padding:'6px 10px',borderBottom:`1px solid ${brd}`,background:i%2===0?bg2:card,alignItems:'center',gap:6}}>
-              <div style={{fontSize:11,fontWeight:600,color:gold2}}>{l}</div>
-              <input type="number" value={sals[i]||''} placeholder="0" onChange={e=>{const c=[...sals];c[i]=+e.target.value;setSals(c)}} style={{...inp,width:90,direction:'ltr',textAlign:'center',padding:'6px 7px'}}/>
-              {sals[i]>0&&<button onClick={()=>setSals(prev=>prev.map((s,j)=>j>i?sals[i]:s))} style={{padding:'5px 8px',borderRadius:8,border:`1px solid ${brd}`,background:bg,color:txt2,fontSize:10,cursor:'pointer',fontFamily:'inherit'}}>↓</button>}
+            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr auto auto',padding:'3px 8px',borderBottom:`1px solid ${brd}`,background:i%2===0?bg2:card,alignItems:'center',gap:4}}>
+              <div style={{fontSize:10,fontWeight:600,color:gold2}}>{l}</div>
+              <input type="number" value={sals[i]||''} placeholder="0" onChange={e=>{const c=[...sals];c[i]=+e.target.value;setSals(c)}} style={{...inp,width:80,direction:'ltr',textAlign:'center',padding:'4px 6px',fontSize:12}}/>
+              {sals[i]>0&&<button onClick={()=>setSals(prev=>prev.map((s,j)=>j>i?sals[i]:s))} style={{padding:'3px 7px',borderRadius:7,border:`1px solid ${brd}`,background:bg,color:txt2,fontSize:9,cursor:'pointer',fontFamily:'inherit'}}>↓</button>}
             </div>
           ))}
         </div>
