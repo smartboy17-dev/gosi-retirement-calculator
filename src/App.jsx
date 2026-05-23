@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 const age=(bd)=>{if(!bd)return{g:0,h:0};const g=(Date.now()-new Date(bd))/(365.25*864e5);return{g:+(g).toFixed(1),h:+(g*1.03069).toFixed(1)}};
 const ageAt=(bd,td)=>{if(!bd||!td)return{g:0,h:0};const g=(new Date(td)-new Date(bd))/(365.25*864e5);return{g:+(g).toFixed(1),h:+(g*1.03069).toFixed(1)}};
@@ -69,21 +69,28 @@ const retInfo=(bd,mRAtRF)=>{
 
 const SYS=['تأمينات - قطاع خاص','تأمينات - قطاع حكومي','تقاعد مدني','تقاعد عسكري','اشتراك اختياري'];
 
+// ── حفظ البيانات محلياً ────────────────────────────────────────
+const LS_KEY='gosi_calc_v2';
+const lsLoad=k=>{try{const v=localStorage.getItem(LS_KEY);return v?JSON.parse(v)[k]:null}catch{return null}};
+
 export default function App(){
   const[tab,setTab]=useState('merged');
-  const[periods,setPeriods]=useState([]);
-  const[info,setInfo]=useState({bd:'',rd:''});
-  const[retAge,setRetAge]=useState('');
-  const[retAgeH,setRetAgeH]=useState('');
-  const[deps,setDeps]=useState(0);
-  const[sals,setSals]=useState(Array(24).fill(0));
-  const[target,setTarget]=useState(0);
-  const[mergedPeriods,setMergedPeriods]=useState(false);
-  const[transferProgram,setTransferProgram]=useState(false);
-  const[bdCal,setBdCal]=useState('g');
-  const[bdH,setBdH]=useState('');
-  const[rdH,setRdH]=useState('');
-  const[mandRaise,setMandRaise]=useState(10);
+  const[periods,setPeriods]=useState(()=>lsLoad('periods')||[]);
+  const[info,setInfo]=useState(()=>lsLoad('info')||{bd:'',rd:''});
+  const[retAge,setRetAge]=useState(()=>lsLoad('retAge')||'');
+  const[retAgeH,setRetAgeH]=useState(()=>lsLoad('retAgeH')||'');
+  const[deps,setDeps]=useState(()=>lsLoad('deps')||0);
+  const[sals,setSals]=useState(()=>lsLoad('sals')||Array(24).fill(0));
+  const[target,setTarget]=useState(()=>lsLoad('target')||0);
+  const[mergedPeriods,setMergedPeriods]=useState(()=>lsLoad('mergedPeriods')||false);
+  const[transferProgram,setTransferProgram]=useState(()=>lsLoad('transferProgram')||false);
+  const[bdCal,setBdCal]=useState(()=>lsLoad('bdCal')||'g');
+  const[bdH,setBdH]=useState(()=>lsLoad('bdH')||'');
+  const[rdH,setRdH]=useState(()=>lsLoad('rdH')||'');
+  const[mandRaise,setMandRaise]=useState(()=>lsLoad('mandRaise')??10);
+
+  // حفظ تلقائي عند كل تغيير
+  useEffect(()=>{try{localStorage.setItem(LS_KEY,JSON.stringify({periods,info,retAge,retAgeH,deps,sals,target,mergedPeriods,transferProgram,bdCal,bdH,rdH,mandRaise}))}catch{}},[periods,info,retAge,retAgeH,deps,sals,target,mergedPeriods,transferProgram,bdCal,bdH,rdH,mandRaise]);
 
   const handleRdChange=v=>{setInfo(p=>({...p,rd:v}));setRdH(isoToHijriStr(v));if(info.bd&&v){const a=ageAt(info.bd,v);setRetAge(a.g>0?String(a.g):'');const hA=hijriRetAgeCalc(info.bd,v);if(hA)setRetAgeH(String(+(hA.yrs+hA.mths/12).toFixed(2)));} };
   const handleRdHijriChange=v=>{setRdH(v);const iso=hijriStrToIso(v);if(iso){setInfo(p=>({...p,rd:iso}));if(info.bd){const a=ageAt(info.bd,iso);setRetAge(a.g>0?String(a.g):'');const hA=hijriRetAgeCalc(info.bd,iso);if(hA)setRetAgeH(String(+(hA.yrs+hA.mths/12).toFixed(2)));}}};
@@ -342,6 +349,9 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           <div style={{width:5,height:5,borderRadius:'50%',background:'#6EE7B7'}}/>
           <span style={{fontSize:9,color:'rgba(255,255,255,0.85)',letterSpacing:0.5}}>نظام م/33 • تبادل المنافع م/53 • تعديلات يوليو 2024</span>
         </div>
+        {periods.length>0&&<div style={{marginTop:8}}>
+          <button onClick={()=>{if(confirm('هل تريد مسح جميع البيانات والبدء من جديد؟')){localStorage.removeItem(LS_KEY);window.location.reload()}}} style={{padding:'3px 12px',borderRadius:20,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.7)',fontSize:9,cursor:'pointer',fontFamily:'inherit',backdropFilter:'blur(4px)'}}>🗑️ مسح البيانات</button>
+        </div>}
       </div>
     </div>
 
@@ -366,7 +376,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         {/* تاريخ الميلاد */}
         <div style={{marginBottom:12}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-            <div style={{fontSize:10,color:txt2,fontWeight:600}}>تاريخ الميلاد</div>
+            <div style={{fontSize:13,color:txt2,fontWeight:600}}>تاريخ الميلاد</div>
             <div style={{display:'flex',gap:4}}>
               {[{v:'g',lb:'م'},{v:'h',lb:'هـ'}].map(o=>(
                 <button key={o.v} onClick={()=>handleBdCal(o.v)} style={{padding:'3px 10px',borderRadius:8,border:`1.5px solid ${bdCal===o.v?gold:brd}`,background:bdCal===o.v?gold2:'transparent',color:bdCal===o.v?bg:txt2,fontSize:9,cursor:'pointer',fontWeight:700,fontFamily:'inherit'}}>{o.lb}</button>
@@ -388,12 +398,12 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         {/* تاريخ التقاعد */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
           <div>
-            <div style={{fontSize:9,color:gold,marginBottom:4,fontWeight:700}}>📅 تاريخ التقاعد (م)</div>
+            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>📅 تاريخ التقاعد (م)</div>
             <input type="date" value={info.rd} onChange={e=>handleRdChange(e.target.value)} style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
             {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{fmtHijri(info.rd)}</div>}
           </div>
           <div>
-            <div style={{fontSize:9,color:gold,marginBottom:4,fontWeight:700}}>🌙 تاريخ التقاعد (هـ)</div>
+            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 تاريخ التقاعد (هـ)</div>
             <input type="text" value={rdH||isoToHijriStr(info.rd)} onChange={e=>handleRdHijriChange(e.target.value)} placeholder="1446/07/01" style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
             {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(info.rd).toLocaleDateString('ar-SA')}</div>}
           </div>
@@ -402,15 +412,29 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         {/* العمر عند التقاعد */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
           <div>
-            <div style={{fontSize:9,color:gold,marginBottom:4,fontWeight:700}}>🎂 العمر عند التقاعد (م)</div>
+            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🎂 العمر عند التقاعد (م)</div>
             <input type="number" inputMode="decimal" min="40" max="70" step="0.5" value={retAge} onChange={e=>handleAgeChange(e.target.value)} placeholder={ri.rY?`${ri.rY+ri.rM/12}`:'60'} style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
           </div>
           <div>
-            <div style={{fontSize:9,color:gold,marginBottom:4,fontWeight:700}}>🌙 العمر عند التقاعد (هـ)</div>
+            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 العمر عند التقاعد (هـ)</div>
             <input type="number" inputMode="decimal" min="40" max="72" step="0.5" value={retAgeH} onChange={e=>handleAgeHChange(e.target.value)} placeholder="55.5" style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
             {hijriRetAge&&<div style={{fontSize:8,color:gold,marginTop:2,textAlign:'center'}}>{hijriRetAge.yrs} سنة{hijriRetAge.mths>0?` و ${hijriRetAge.mths} شهر`:''}</div>}
           </div>
         </div>
+      </div>
+
+      {/* المعالون */}
+      <div style={{...crd,padding:'12px 16px',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:13,color:txt2,fontWeight:600,flexShrink:0}}>👨‍👩‍👧 عدد المعالين:</span>
+          <select value={deps} onChange={e=>setDeps(+e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none',flex:1}}>
+            <option value={0}>بدون معالين</option>
+            <option value={1}>1 معال — يضيف 10% على المعاش</option>
+            <option value={2}>2 معالين — يضيف 15% على المعاش</option>
+            <option value={3}>3 معالين أو أكثر — يضيف 20% على المعاش</option>
+          </select>
+        </div>
+        <div style={{fontSize:10,color:txt2,marginTop:5}}>المعالون: الزوج/الزوجة + الأبناء غير المتزوجين دون 18 سنة (أو حتى 26 للطلاب)</div>
       </div>
 
       {/* المدد */}
@@ -432,18 +456,19 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
               <button onClick={()=>setPeriods(x=>x.filter(q=>q.id!==p.id))} style={{padding:'4px 10px',borderRadius:8,border:'none',background:redL,color:red,fontSize:10,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>حذف</button>
             </div>
 
-            <input value={p.emp} onChange={e=>upP(p.id,'emp',e.target.value)} placeholder="اسم جهة العمل" style={{...inp,marginBottom:8,textAlign:'right'}}/>
+            <input value={p.emp} onChange={e=>upP(p.id,'emp',e.target.value)} placeholder="اسم جهة العمل (مثال: وزارة المالية / شركة أرامكو)" style={{...inp,marginBottom:4,textAlign:'right'}}/>
+            <div style={{fontSize:9,color:txt2,marginBottom:8}}>سيظهر في التقرير النهائي كمرجع</div>
 
             <div style={{display:'flex',gap:6,marginBottom:8,alignItems:'center'}}>
-              <span style={{fontSize:9,color:txt2,fontWeight:600}}>التقويم:</span>
+              <span style={{fontSize:11,color:txt2,fontWeight:600}}>التقويم:</span>
               {[{v:'g',lb:'م ميلادي'},{v:'h',lb:'هـ هجري'}].map(o=>(
-                <button key={o.v} onClick={()=>toggleCal(p.id,o.v)} style={{padding:'4px 10px',borderRadius:8,border:`1.5px solid ${(p.cal||'g')===o.v?sc:brd}`,background:(p.cal||'g')===o.v?sc:'transparent',color:(p.cal||'g')===o.v?'#fff':txt2,fontSize:9,cursor:'pointer',fontWeight:700,fontFamily:'inherit'}}>{o.lb}</button>
+                <button key={o.v} onClick={()=>toggleCal(p.id,o.v)} style={{padding:'4px 10px',borderRadius:8,border:`1.5px solid ${(p.cal||'g')===o.v?sc:brd}`,background:(p.cal||'g')===o.v?sc:'transparent',color:(p.cal||'g')===o.v?'#fff':txt2,fontSize:10,cursor:'pointer',fontWeight:700,fontFamily:'inherit'}}>{o.lb}</button>
               ))}
             </div>
 
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
               <div>
-                <div style={{fontSize:9,color:txt2,marginBottom:4}}>تاريخ البداية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
+                <div style={{fontSize:11,color:txt2,marginBottom:4}}>تاريخ البداية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
                 {(p.cal||'g')==='h'
                   ?<><input type="text" value={p.sdH!==undefined?p.sdH:isoToHijriStr(p.sd)} onChange={e=>handleHijriDate(p.id,'sd',e.target.value)} placeholder="1446/07/01" style={{...inp,direction:'ltr',textAlign:'center'}}/>
                     {p.sd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(p.sd).toLocaleDateString('ar-SA')}</div>}</>
@@ -452,7 +477,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                 }
               </div>
               <div>
-                <div style={{fontSize:9,color:txt2,marginBottom:4}}>تاريخ النهاية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
+                <div style={{fontSize:11,color:txt2,marginBottom:4}}>تاريخ النهاية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
                 {p.ac
                   ?<div style={{padding:'10px 8px',borderRadius:10,background:grnL,color:grn,fontSize:10,fontWeight:600,textAlign:'center',border:`1px solid ${grn}30`}}>مستمر → {info.rd?new Date(info.rd).toLocaleDateString('ar-SA'):'التقاعد'}</div>
                   :(p.cal||'g')==='h'
@@ -471,15 +496,17 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
 
             <div style={{display:'grid',gridTemplateColumns:`1fr 1fr${p.ac?'':' 1fr'}`,gap:6}}>
               <div>
-                <div style={{fontSize:9,color:txt2,marginBottom:4}}>الأجر (ر.س)</div>
+                <div style={{fontSize:11,color:txt2,marginBottom:4}}>الأجر الشهري (ر.س)</div>
                 <input type="number" value={p.sl||''} onChange={e=>upP(p.id,'sl',+e.target.value)} style={{...inp,direction:'ltr',textAlign:'center'}}/>
+                <div style={{fontSize:9,color:txt2,marginTop:3}}>الأجر الخاضع للتأمين (يُستخدم لحساب المعاش)</div>
               </div>
               <div>
-                <div style={{fontSize:9,color:txt2,marginBottom:4}}>النظام</div>
-                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:8,appearance:'none',WebkitAppearance:'none'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
+                <div style={{fontSize:11,color:txt2,marginBottom:4}}>النظام</div>
+                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:10,appearance:'none',WebkitAppearance:'none'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
+                <div style={{fontSize:9,color:txt2,marginTop:3}}>{p.sy.includes('مدني')||p.sy.includes('عسكري')?'التقاعد المدني: وزارات + جهات حكومية':p.sy.includes('اختياري')?'الاشتراك الاختياري: للمستقلين والعاطلين':p.sy.includes('حكومي')?'تأمينات حكومي: شركات حكومية كأرامكو':'تأمينات خاص: القطاع الخاص'}</div>
               </div>
               {!p.ac&&<div>
-                <div style={{fontSize:9,color:txt2,marginBottom:4}}>الحالة</div>
+                <div style={{fontSize:11,color:txt2,marginBottom:4}}>الحالة</div>
                 <select value={p.st} onChange={e=>upP(p.id,'st',e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none'}}><option>نشط</option><option>منتهي</option><option>مستبعد</option></select>
               </div>}
             </div>
@@ -500,6 +527,9 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
       </div>
       <div style={crd}>
         <SH icon="💰" label={`أجور آخر 24 شهر — حتى ${info.rd?new Date(info.rd).toLocaleDateString('ar-SA'):'تاريخ التقاعد'}`} color={gold}/>
+        <div style={{background:bluL,borderRadius:10,padding:'8px 12px',marginBottom:10,fontSize:10,color:blu,lineHeight:1.7,border:`1px solid ${blu}20`}}>
+          💡 <strong>لماذا مهمة؟</strong> متوسط أجور آخر 24 شهر هو الأساس في حساب معاشك. أدخلها بدقة للحصول على نتيجة صحيحة. يمكنك تعبئتها تلقائياً بآخر أجر مدخل في المدد.
+        </div>
         <button onClick={()=>setSals(s24.map(()=>ps.lS||0))} style={{padding:'7px 12px',borderRadius:10,border:`1px solid ${pur}`,background:purL,color:pur,fontWeight:700,fontSize:10,cursor:'pointer',fontFamily:'inherit',marginBottom:8}}>تعبئة بآخر أجر — {fI(ps.lS)} ر.س</button>
         <div style={{borderRadius:12,border:`1px solid ${brd}`,overflow:'hidden',maxHeight:400,overflowY:'auto'}}>
           {s24.map((l,i)=>(
@@ -654,15 +684,27 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
       </div>
 
 
-      <div style={{background:bg2,borderRadius:12,padding:'8px 12px',fontSize:8,color:txt2,lineHeight:2,border:`1px solid ${brd}`,marginBottom:4}}>
+      <div style={{background:bg2,borderRadius:12,padding:'8px 12px',fontSize:8,color:txt2,lineHeight:2,border:`1px solid ${brd}`,marginBottom:12}}>
         <strong style={{color:gold}}>المرجع: </strong>قرار مجلس الوزراء — تعديلات نظامي التقاعد المدني والتأمينات الاجتماعية — 3 يوليو 2024م
       </div>
+
+      <button onClick={()=>setTab('result')} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:4,boxShadow:`0 8px 32px ${gold}40`,letterSpacing:0.3}}>احسب معاشي التقاعدي ←</button>
 
       </div>);
     })()}
 
     {/* ════ تبويب النتائج ════ */}
     {tab==='result'&&(<div>
+
+      {/* empty state */}
+      {periods.length===0&&(
+        <div style={{textAlign:'center',padding:'48px 24px'}}>
+          <div style={{fontSize:52,marginBottom:16}}>📋</div>
+          <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:8}}>لا توجد بيانات بعد</div>
+          <div style={{fontSize:13,color:txt2,marginBottom:24,lineHeight:1.8}}>أدخل تاريخ ميلادك والمدد الوظيفية في صفحة البيانات حتى تظهر نتائجك هنا.</div>
+          <button onClick={()=>setTab('merged')} style={{padding:'13px 28px',borderRadius:14,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 6px 24px ${gold}40`}}>← ابدأ بإدخال البيانات</button>
+        </div>
+      )}
 
       {/* ══ مقارنة السيناريوهات (مدد مختلطة) ══ */}
       {hasMixedSys&&tf.has&&(()=>{
@@ -982,15 +1024,6 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         );
       })()}
 
-      {/* المعالون */}
-      <div style={{...crd,padding:'10px 14px',marginBottom:12}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <span style={{fontSize:10,color:txt2,fontWeight:600,flexShrink:0}}>المعالون:</span>
-          <select value={deps} onChange={e=>setDeps(+e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none',flex:1}}>
-            <option value={0}>بدون معالين</option><option value={1}>1 معال — 10%</option><option value={2}>2 معالين — 15%</option><option value={3}>3+ معالين — 20%</option>
-          </select>
-        </div>
-      </div>
 
       {/* مقارنة المعاش الحالي والمتوقع */}
       {(()=>{
