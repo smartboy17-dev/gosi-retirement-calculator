@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "sa.app.retirementcalculator",
+    "sha256_cert_fingerprints": [
+      "26:23:77:FB:1D:74:B5:80:FA:09:C7:45:45:01:A1:9D:58:27:93:91:4F:D9:38:EF:6F:62:D6:86:62:FC:B9:4F"
+    ]
+  }
+}]
