@@ -492,14 +492,15 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
   };
 
   // ── الثيم الفاتح العصري ──────────────────────────────────────
-  const bg='#F2F6F3',bg2='#FFFFFF',card='#FFFFFF',brd='rgba(0,0,0,0.07)',brd2='rgba(0,0,0,0.04)';
-  const gold='#059669',gold2='#047857',goldL='#ECFDF5';
-  const grn='#10B981',grnL='#D1FAE5';
-  const red='#EF4444',redL='#FEF2F2';
+  // ── Parco colour scheme ───────────────────────────────────────────
+  const bg='#EEF1F9',bg2='#FFFFFF',card='#FFFFFF',brd='rgba(27,30,53,0.09)',brd2='rgba(27,30,53,0.05)';
+  const gold='#1B2040',gold2='#0F1528',goldL='#E8EDF8';
+  const grn='#10B981',grnL='#ECFDF5';
+  const red='#EF4444',redL='#FFF1F0';
   const blu='#3B82F6',bluL='#EFF6FF';
   const pur='#7C3AED',purL='#F5F3FF';
-  const org='#D97706',orgL='#FFFBEB';
-  const txt='#0C1F14',txt2='#6B7280';
+  const org='#F97316',orgL='#FFF7ED';
+  const txt='#0F172A',txt2='#64748B';
 
   const inp={width:'100%',padding:'11px 13px',borderRadius:12,border:`1.5px solid ${brd}`,background:'#FAFCFB',color:txt,fontSize:13,fontFamily:"'Tajawal',sans-serif",boxSizing:'border-box',outline:'none',transition:'border-color 0.2s',boxShadow:'inset 0 1px 3px rgba(0,0,0,0.04)'};
   const crd={background:card,borderRadius:20,padding:18,marginBottom:12,border:`1px solid ${brd}`,boxShadow:'0 2px 8px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)'};
@@ -523,7 +524,7 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet"/>
 
     {/* ── Header ── */}
-    <div style={{background:'linear-gradient(160deg,#022C22 0%,#065F46 55%,#059669 100%)',padding:'24px 16px 18px',paddingTop:'calc(env(safe-area-inset-top,0px)+22px)',position:'relative',overflow:'hidden'}}>
+    <div style={{background:'linear-gradient(135deg,#1B1E35 0%,#252A4E 55%,#2E3566 100%)',padding:'24px 16px 18px',paddingTop:'calc(env(safe-area-inset-top,0px)+22px)',position:'relative',overflow:'hidden'}}>
       <div style={{position:'absolute',top:-80,right:-60,width:260,height:260,background:'radial-gradient(circle,rgba(255,255,255,0.07) 0%,transparent 65%)',pointerEvents:'none'}}/>
       <div style={{position:'absolute',bottom:-1,left:0,right:0,height:24,background:'linear-gradient(180deg,transparent,rgba(242,246,243,0.15))',borderRadius:'50% 50% 0 0 / 0 0 100% 100%'}}/>
       <div style={{textAlign:'center',position:'relative'}}>
@@ -905,95 +906,106 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
         );
       })()}
 
-      <button onClick={()=>setTab('result')} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:4,boxShadow:`0 8px 32px ${gold}40`,letterSpacing:0.3}}>احسب معاشي التقاعدي ←</button>
+      <button onClick={()=>setTab('result')} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:'linear-gradient(135deg,#1B1E35,#2E3566)',color:'#FFFFFF',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:4,boxShadow:'0 8px 32px rgba(27,30,53,0.35)',letterSpacing:0.3}}>احسب معاشي التقاعدي ←</button>
     </div>)}
 
     {/* ════ تبويب النتائج ════ */}
     {tab==='result'&&(<div>
 
-      {/* ── Retirement Readiness Dashboard ── */}
+      {/* ── Retirement Readiness Dashboard — Parco Style ── */}
       {(info.bd||periods.length>0)&&(
-      <div style={{background:'linear-gradient(160deg,#022C22 0%,#065F46 55%,#059669 100%)',borderRadius:24,padding:'20px 16px 18px',marginBottom:14,position:'relative',overflow:'hidden',boxShadow:'0 8px 32px rgba(5,150,105,0.25)'}}>
-        <div style={{position:'absolute',top:-60,right:-40,width:200,height:200,background:'radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%)',pointerEvents:'none'}}/>
-        <div style={{position:'absolute',bottom:-20,left:-20,width:140,height:140,background:'radial-gradient(circle,rgba(255,255,255,0.05),transparent 70%)',pointerEvents:'none'}}/>
-        {/* Title */}
-        <div style={{textAlign:'center',marginBottom:14,position:'relative'}}>
-          <div style={{fontSize:8,color:'rgba(255,255,255,0.55)',letterSpacing:2.5,marginBottom:10,textTransform:'uppercase',fontWeight:500}}>Retirement Readiness Score</div>
-          {/* SVG Gauge */}
+      <div style={{background:'#FFFFFF',borderRadius:20,marginBottom:14,overflow:'hidden',boxShadow:'0 4px 24px rgba(27,30,53,0.10)'}}>
+        {/* Dark navy header strip */}
+        <div style={{background:'linear-gradient(135deg,#1B1E35 0%,#252A4E 60%,#2E3566 100%)',padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontSize:8,color:'rgba(255,255,255,0.55)',letterSpacing:2,textTransform:'uppercase',fontWeight:500}}>Retirement Readiness</div>
+            <div style={{fontSize:15,fontWeight:900,color:'#FFFFFF',marginTop:2}}>مؤشر الجاهزية للتقاعد</div>
+          </div>
+          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:10,padding:'7px 14px',border:'1px solid rgba(255,255,255,0.18)',textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:readiness>=70?'#34D399':readiness>=40?'#FCD34D':'#F87171',lineHeight:1}}>{readiness}%</div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.6)',marginTop:2}}>{readiness>=70?'ممتاز':readiness>=50?'جيد':readiness>=30?'متوسط':'ضعيف'}</div>
+          </div>
+        </div>
+
+        <div style={{padding:'16px 14px 14px'}}>
+          {/* Parco-style Speedometer Gauge */}
+          <div style={{display:'flex',justifyContent:'center',marginBottom:12}}>
           {(()=>{
-            const R=58,cx=75,cy=72,S=150;
-            const startA=Math.PI*0.72,endA=Math.PI*2.28;
-            const range=endA-startA;
+            const CX=100,CY=88,R=70,SW=14,W=200,H=100;
             const pct=readiness/100;
-            const fillA=startA+range*pct;
-            const arcPath=(a1,a2,r,sweep=1)=>{
-              const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
-              const x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
-              const la=(a2-a1)%(Math.PI*2)>Math.PI?1:0;
-              return`M${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${la} ${sweep} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
-            };
-            const clr=readiness>=70?'#34D399':readiness>=40?'#FCD34D':'#F87171';
-            const segments=[
-              {from:startA,to:startA+range*0.4,clr:'#EF4444'},
-              {from:startA+range*0.4,to:startA+range*0.7,clr:'#F59E0B'},
-              {from:startA+range*0.7,to:endA,clr:'#10B981'},
-            ];
+            const circ=Math.PI*R;
+            const dashFill=pct*circ;
+            const nA=Math.PI*(1-pct);
+            const nx=(CX+R*Math.cos(nA)).toFixed(1);
+            const ny=(CY-R*Math.sin(nA)).toFixed(1);
+            const gClr=readiness>=70?'#10B981':readiness>=40?'#F97316':'#EF4444';
+            const arcD=`M ${CX-R} ${CY} A ${R} ${R} 0 0 0 ${CX+R} ${CY}`;
             return(
-              <div style={{display:'flex',justifyContent:'center'}}>
-              <svg viewBox={`0 0 ${S} ${S}`} style={{width:130,height:115,display:'block',overflow:'visible'}}>
-                {/* Track segments */}
-                {segments.map((s,i)=>(
-                  <path key={i} d={arcPath(s.from,s.to,R)} fill="none" stroke={s.clr} strokeWidth="11" strokeLinecap="butt" opacity="0.22"/>
-                ))}
-                {/* Fill arc */}
-                {readiness>0&&<path d={arcPath(startA,fillA,R)} fill="none" stroke={clr} strokeWidth="11" strokeLinecap="round"/>}
-                {/* Center score */}
-                <text x={cx} y={cy-12} textAnchor="middle" fontSize="34" fontWeight="900" fill="#fff" fontFamily="Tajawal,sans-serif">{readiness}</text>
-                <text x={cx} y={cy+8} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.55)" fontFamily="Tajawal,sans-serif">من 100</text>
-                <text x={cx} y={cy+26} textAnchor="middle" fontSize="10" fill={clr} fontWeight="800" fontFamily="Tajawal,sans-serif">
-                  {readiness>=70?'ممتاز ✓':readiness>=50?'جيد':readiness>=30?'متوسط':'يحتاج تحسين'}
-                </text>
-                {/* Tick labels */}
-                {[{a:startA,lb:'0'},{a:startA+range*0.5,lb:'50'},{a:endA,lb:'100'}].map((t,i)=>(
-                  <text key={i} x={(cx+(R+18)*Math.cos(t.a)).toFixed(1)} y={(cy+(R+18)*Math.sin(t.a)+4).toFixed(1)} textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.35)" fontFamily="Tajawal,sans-serif">{t.lb}</text>
-                ))}
+              <svg viewBox={`0 0 ${W} ${H+4}`} style={{width:210,height:108,display:'block',overflow:'visible'}}>
+                {/* Background track */}
+                <path d={arcD} fill="none" stroke="#E2E8F0" strokeWidth={SW} strokeLinecap="round"/>
+                {/* Dim colored zones */}
+                <path d={arcD} fill="none" stroke="#EF4444" strokeWidth={SW} strokeLinecap="butt" opacity="0.18" strokeDasharray={`${(circ*0.4).toFixed(1)} ${circ.toFixed(1)}`}/>
+                <path d={arcD} fill="none" stroke="#F97316" strokeWidth={SW} strokeLinecap="butt" opacity="0.18" strokeDasharray={`${(circ*0.3).toFixed(1)} ${circ.toFixed(1)}`} strokeDashoffset={`-${(circ*0.4).toFixed(1)}`}/>
+                <path d={arcD} fill="none" stroke="#10B981" strokeWidth={SW} strokeLinecap="butt" opacity="0.18" strokeDasharray={`${(circ*0.3).toFixed(1)} ${circ.toFixed(1)}`} strokeDashoffset={`-${(circ*0.7).toFixed(1)}`}/>
+                {/* Active fill */}
+                {readiness>0&&<path d={arcD} fill="none" stroke={gClr} strokeWidth={SW} strokeLinecap="round" strokeDasharray={`${dashFill.toFixed(1)} ${(circ-dashFill).toFixed(1)}`}/>}
+                {/* Needle */}
+                <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="#1B1E35" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx={CX} cy={CY} r="5.5" fill="#1B1E35"/>
+                <circle cx={CX} cy={CY} r="2.5" fill="white"/>
+                {/* Zone tick labels */}
+                <text x={CX-R-6} y={CY+14} textAnchor="middle" fontSize="7.5" fill="#94A3B8" fontFamily="Cairo,sans-serif">0</text>
+                <text x={CX} y="14" textAnchor="middle" fontSize="7.5" fill="#94A3B8" fontFamily="Cairo,sans-serif">50</text>
+                <text x={CX+R+6} y={CY+14} textAnchor="middle" fontSize="7.5" fill="#94A3B8" fontFamily="Cairo,sans-serif">100</text>
+                {/* Improve my score */}
+                <text x={CX} y={CY+18} textAnchor="middle" fontSize="8" fill={gClr} fontWeight="700" fontFamily="Cairo,sans-serif">{readiness>=70?'ممتاز ✓':readiness>=50?'جيد':readiness>=30?'متوسط':'يحتاج تحسين'}</text>
               </svg>
-              </div>
             );
           })()}
+          </div>
+
+          {/* 3 Stat cards — Parco style */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:ps.tM>0&&ri.eR>0?10:0}}>
+            <div style={{background:'#F8FAFC',borderRadius:12,padding:'10px 8px',textAlign:'center',border:'1px solid #E2E8F0'}}>
+              <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:24,height:24,borderRadius:8,background:'#ECFDF5',marginBottom:4}}>
+                <span style={{fontSize:12}}>💰</span>
+              </div>
+              <div style={{fontSize:7,color:'#94A3B8',marginBottom:2,letterSpacing:0.3}}>Monthly Pension</div>
+              <div style={{fontSize:pen.f?13:10,fontWeight:900,color:'#0F172A',lineHeight:1}}>{pen.f?fmt(pen.f):'—'}</div>
+              <div style={{fontSize:6.5,color:'#94A3B8',marginTop:2}}>ر.س / شهر</div>
+            </div>
+            <div style={{background:'#F8FAFC',borderRadius:12,padding:'10px 8px',textAlign:'center',border:'1px solid #E2E8F0'}}>
+              <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:24,height:24,borderRadius:8,background:'#EFF6FF',marginBottom:4}}>
+                <span style={{fontSize:12}}>⏱️</span>
+              </div>
+              <div style={{fontSize:7,color:'#94A3B8',marginBottom:2,letterSpacing:0.3}}>Time to Retire</div>
+              <div style={{fontSize:countdown?13:10,fontWeight:900,color:'#0F172A',lineHeight:1}}>{countdown?`${countdown.y}س ${countdown.r}ش`:'—'}</div>
+              <div style={{fontSize:6.5,color:'#94A3B8',marginTop:2}}>{countdown?`${countdown.m} شهر`:''}</div>
+            </div>
+            <div style={{background:'#F8FAFC',borderRadius:12,padding:'10px 8px',textAlign:'center',border:'1px solid #E2E8F0'}}>
+              <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:24,height:24,borderRadius:8,background:'#FFF7ED',marginBottom:4}}>
+                <span style={{fontSize:12}}>📅</span>
+              </div>
+              <div style={{fontSize:7,color:'#94A3B8',marginBottom:2,letterSpacing:0.3}}>Service Progress</div>
+              <div style={{fontSize:ps.tM?13:10,fontWeight:900,color:'#0F172A',lineHeight:1}}>{ps.tM?`${Math.floor(ps.tM/12)}س`:'—'}</div>
+              <div style={{fontSize:6.5,color:'#94A3B8',marginTop:2}}>{ps.tM?`${ps.tM}/${ri.eR}ش`:''}</div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {ps.tM>0&&ri.eR>0&&(
+            <div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                <span style={{fontSize:8,color:'#64748B',fontWeight:500}}>نسبة استيفاء التقاعد المبكر</span>
+                <span style={{fontSize:8,color:'#0F172A',fontWeight:700}}>{Math.min(100,Math.round(psAtRF.tM/ri.eR*100))}%</span>
+              </div>
+              <div style={{height:7,borderRadius:7,background:'#E2E8F0',overflow:'hidden'}}>
+                <div style={{height:'100%',borderRadius:7,background:psAtRF.tM>=ri.eR?'linear-gradient(90deg,#34D399,#10B981)':'linear-gradient(90deg,#FCD34D,#F97316)',width:`${Math.min(100,psAtRF.tM/ri.eR*100).toFixed(1)}%`,transition:'width 0.6s ease'}}/>
+              </div>
+            </div>
+          )}
         </div>
-        {/* 3 Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,position:'relative'}}>
-          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
-            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Monthly Pension</div>
-            <div style={{fontSize:pen.f?14:12,fontWeight:900,color:'#fff',lineHeight:1}}>{pen.f?fmt(pen.f):'—'}</div>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>ر.س / شهر</div>
-          </div>
-          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
-            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Time to Retire</div>
-            <div style={{fontSize:14,fontWeight:900,color:'#fff',lineHeight:1}}>
-              {countdown?`${countdown.y}س ${countdown.r}ش`:'—'}
-            </div>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>{countdown?`${countdown.m} شهر`:'حدد تاريخ التقاعد'}</div>
-          </div>
-          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
-            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Service Progress</div>
-            <div style={{fontSize:14,fontWeight:900,color:'#fff',lineHeight:1}}>{ps.tM?`${Math.floor(ps.tM/12)}س`:'—'}</div>
-            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>{ps.tM?`${ps.tM} / ${ri.eR} شهر`:'أدخل مدد الخدمة'}</div>
-          </div>
-        </div>
-        {/* progress bar for service */}
-        {ps.tM>0&&ri.eR>0&&(
-          <div style={{marginTop:12,position:'relative'}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-              <span style={{fontSize:8,color:'rgba(255,255,255,0.6)'}}>نسبة استيفاء التقاعد المبكر</span>
-              <span style={{fontSize:8,color:'rgba(255,255,255,0.8)',fontWeight:700}}>{Math.min(100,Math.round(psAtRF.tM/ri.eR*100))}%</span>
-            </div>
-            <div style={{height:6,borderRadius:6,background:'rgba(255,255,255,0.1)',overflow:'hidden'}}>
-              <div style={{height:'100%',borderRadius:6,background:`linear-gradient(90deg,${psAtRF.tM>=ri.eR?'#6EE7B7':'#FCD34D'},${psAtRF.tM>=ri.eR?'#34D399':'#F59E0B'})`,width:`${Math.min(100,psAtRF.tM/ri.eR*100).toFixed(1)}%`,transition:'width 0.6s ease'}}/>
-            </div>
-          </div>
-        )}
       </div>
       )}
 
