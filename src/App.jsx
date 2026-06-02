@@ -850,6 +850,63 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
       })}
       </div>
 
+      {/* ── خط زمني للخدمة (Gantt) ── */}
+      {periods.filter(p=>p.st!=='مستبعد'&&p.sd).length>0&&(()=>{
+        const valid=[...periods].filter(p=>p.st!=='مستبعد'&&p.sd).sort((a,b)=>new Date(a.sd)-new Date(b.sd));
+        const minD=new Date(valid[0].sd);
+        const maxD=info.rd?new Date(info.rd):new Date();
+        const totalMs=Math.max(1,maxD-minD);
+        const sysC={'تأمينات - قطاع خاص':org,'تأمينات - قطاع حكومي':blu,'تقاعد مدني':pur,'تقاعد عسكري':red,'اشتراك اختياري':grn};
+        const minY=minD.getFullYear(),maxY=maxD.getFullYear();
+        return(
+          <div style={{...crd,marginBottom:10}}>
+            <SH icon="📅" label="الخط الزمني للخدمة" color={gold}/>
+            {/* Year axis */}
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+              {[minY,Math.round((minY+maxY)/2),maxY].map((y,i)=>(
+                <span key={i} style={{fontSize:8,color:txt2}}>{y}</span>
+              ))}
+            </div>
+            <div style={{height:1.5,background:brd,borderRadius:1,marginBottom:8}}/>
+            {/* Bars */}
+            {valid.map((p,i)=>{
+              const s=new Date(p.sd);
+              const e=p.ac?maxD:(p.ed?new Date(p.ed):maxD);
+              const left=((s-minD)/totalMs*100).toFixed(1);
+              const width=Math.max(1.5,((e-s)/totalMs*100)).toFixed(1);
+              const clr=sysC[p.sy]||'#94A3B8';
+              const mths=mdfCal(p.sd,p.ac?aEnd:p.ed,p.cal||'g').t;
+              return(
+                <div key={p.id} style={{marginBottom:6}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
+                    <div style={{width:7,height:7,borderRadius:2,background:clr,flexShrink:0}}/>
+                    <span style={{fontSize:9,color:txt,fontWeight:600,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.emp||`مدة ${i+1}`}</span>
+                    <span style={{fontSize:8,color:clr,fontWeight:700,flexShrink:0}}>{Math.floor(mths/12)}س {mths%12>0?`${mths%12}ش`:''}</span>
+                  </div>
+                  <div style={{position:'relative',height:14,background:'#F1F5F9',borderRadius:7,overflow:'hidden'}}>
+                    <div style={{position:'absolute',left:`${left}%`,width:`${width}%`,height:'100%',background:clr,borderRadius:7,opacity:0.85,minWidth:4}}/>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Total */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8,padding:'7px 10px',background:goldL,borderRadius:10}}>
+              <span style={{fontSize:9,color:gold2,fontWeight:600}}>إجمالي مدة الخدمة</span>
+              <span style={{fontSize:13,fontWeight:900,color:gold}}>{fMD(ps.tM)}</span>
+            </div>
+            {/* Legend */}
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:6}}>
+              {[...new Set(valid.map(p=>p.sy))].map(sy=>(
+                <div key={sy} style={{display:'flex',alignItems:'center',gap:4}}>
+                  <div style={{width:7,height:7,borderRadius:2,background:sysC[sy]||'#94A3B8'}}/>
+                  <span style={{fontSize:8,color:txt2}}>{sy}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── وضع التقاعد المبكر والنظامي — تحت المدد مباشرة ── */}
       {info.bd&&(()=>{
         const today=new Date();
@@ -1637,6 +1694,49 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
         <strong style={{color:gold}}>المراجع: </strong>نظام التأمينات م/33 (1421هـ) م.38 • تبادل المنافع م/53 (1424هـ) • قرار م.الوزراء 3/7/2024م البند خامساً • م.24 لائحة التسجيل
       </div>
 
+      {/* ── معدل الاستبدال — Replacement Rate ── */}
+      {pen.f>0&&ps.lS>0&&(()=>{
+        const rate=pen.f/ps.lS*100;
+        const rateClr=rate>=70?grn:rate>=50?org:red;
+        const rateBg=rate>=70?grnL:rate>=50?orgL:redL;
+        return(
+          <div style={{...crd,marginBottom:12}}>
+            <SH icon="💹" label="معدل الاستبدال" color={gold}/>
+            <div style={{fontSize:9,color:txt2,marginBottom:10,lineHeight:1.7}}>نسبة المعاش من الراتب — كلما ارتفعت كان مستوى معيشتك بعد التقاعد أقرب لما قبله.</div>
+            {/* Salary bar */}
+            <div style={{marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,fontSize:10}}>
+                <span style={{color:txt2,fontWeight:600}}>الراتب الحالي</span>
+                <span style={{fontWeight:800,color:txt}}>{fmt(ps.lS)} ر.س</span>
+              </div>
+              <div style={{height:13,background:'#E2E8F0',borderRadius:8,overflow:'hidden'}}>
+                <div style={{width:'100%',height:'100%',background:'#94A3B8',borderRadius:8}}/>
+              </div>
+            </div>
+            {/* Pension bar */}
+            <div style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,fontSize:10}}>
+                <span style={{color:txt2,fontWeight:600}}>المعاش التقاعدي</span>
+                <span style={{fontWeight:800,color:rateClr}}>{fmt(pen.f)} ر.س</span>
+              </div>
+              <div style={{height:13,background:'#E2E8F0',borderRadius:8,overflow:'hidden'}}>
+                <div style={{width:`${Math.min(100,rate).toFixed(1)}%`,height:'100%',background:rateClr,borderRadius:8,transition:'width 0.5s ease'}}/>
+              </div>
+            </div>
+            {/* Rate display */}
+            <div style={{background:rateBg,borderRadius:14,padding:'14px',textAlign:'center',border:`1.5px solid ${rateClr}35`}}>
+              <div style={{fontSize:44,fontWeight:900,color:rateClr,lineHeight:1}}>{rate.toFixed(0)}%</div>
+              <div style={{fontSize:10,color:txt2,marginTop:4}}>معدل الاستبدال (Replacement Rate)</div>
+              <div style={{fontSize:9,color:rateClr,marginTop:6,fontWeight:600,lineHeight:1.7}}>
+                {rate>=70?'ممتاز — معاشك يغطي معظم مصاريفك الحالية':
+                 rate>=50?'متوسط — يُنصح بزيادة الاشتراكات لرفع المعاش':
+                 'منخفض — راجع تبويب التحسين لرفع معاشك'}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <button onClick={()=>setTab('improve')} style={{
         width:'100%',padding:'15px',borderRadius:16,border:`2px solid ${gold}`,
         background:'transparent',color:gold2,fontWeight:800,fontSize:14,
@@ -1976,6 +2076,67 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
                   </div>
                 )}
 
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── رسم نمو المعاش بزيادة سنوات الخدمة ── */}
+        {pen.f>0&&ps.lS>0&&(()=>{
+          const addPM=Math.min(ps.lS,45000)/480;
+          const pts=[0,12,24,36,60,120].map(m=>({
+            m,lb:m===0?'الآن':m===12?'+سنة':m===24?'+2س':m===36?'+3س':m===60?'+5س':'+10س',
+            pen:Math.max(1983.75,+(pen.f+m*addPM).toFixed(0)),
+            gain:+(m*addPM).toFixed(0),
+          }));
+          const maxPen=pts[pts.length-1].pen;
+          const H=92,PT=18,PB=24,CH=H-PT-PB;
+          const BW=30,GAP=8,SX=12;
+          const TW=SX*2+pts.length*(BW+GAP)-GAP;
+          return(
+            <div style={{...crd,marginBottom:14}}>
+              <SH icon="📈" label="تأثير الخدمة الإضافية على المعاش" color={gold}/>
+              <div style={{fontSize:9,color:txt2,marginBottom:10,lineHeight:1.7}}>
+                كل سنة خدمة إضافية ترفع معاشك بـ <strong style={{color:gold}}>{fmt(Math.round(addPM*12))} ر.س / شهر</strong>
+              </div>
+              {/* Bar chart */}
+              <svg viewBox={`0 0 ${TW} ${H}`} style={{width:'100%',maxWidth:340,display:'block',margin:'0 auto 12px',overflow:'visible'}}>
+                {[0.33,0.67,1].map((r,i)=>(
+                  <line key={i} x1={SX} y1={PT+CH-r*CH} x2={TW-SX} y2={PT+CH-r*CH} stroke={brd} strokeWidth="0.5" strokeDasharray="3,4"/>
+                ))}
+                {pts.map((d,i)=>{
+                  const x=SX+i*(BW+GAP);
+                  const bh=Math.max(5,(d.pen/maxPen)*CH);
+                  const by=PT+CH-bh;
+                  const clr=i===0?'#94A3B8':gold;
+                  return(
+                    <g key={i}>
+                      <rect x={x+1.5} y={by+1.5} width={BW} height={bh} rx={5} fill="rgba(0,0,0,0.05)"/>
+                      <rect x={x} y={by} width={BW} height={bh} rx={5} fill={clr} opacity={i===0?0.55:0.88}/>
+                      {i>0&&<rect x={x} y={by} width={BW} height={Math.min(bh,9)} rx={5} fill="rgba(255,255,255,0.22)"/>}
+                      <text x={x+BW/2} y={by-4} textAnchor="middle" fontSize="7" fontWeight={i===0?'400':'700'} fill={clr} fontFamily="Cairo,sans-serif">
+                        {d.pen>=1000?(d.pen/1000).toFixed(1)+'K':d.pen}
+                      </text>
+                      {d.gain>0&&bh>16&&(
+                        <text x={x+BW/2} y={by+11} textAnchor="middle" fontSize="6" fill="#fff" fontWeight="700" fontFamily="Cairo,sans-serif">
+                          +{d.gain>=1000?(d.gain/1000).toFixed(0)+'K':d.gain}
+                        </text>
+                      )}
+                      <text x={x+BW/2} y={H-6} textAnchor="middle" fontSize="7.5" fill={i===0?txt2:gold2} fontWeight={i===0?'400':'700'} fontFamily="Cairo,sans-serif">{d.lb}</text>
+                    </g>
+                  );
+                })}
+                <line x1={SX} y1={PT+CH} x2={TW-SX} y2={PT+CH} stroke={brd} strokeWidth="0.8"/>
+              </svg>
+              {/* Summary cards */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
+                {pts.filter((_,i)=>i>0&&i<=4).map((d,i)=>(
+                  <div key={i} style={{background:goldL,borderRadius:10,padding:'8px 5px',textAlign:'center',border:`1px solid ${gold}20`}}>
+                    <div style={{fontSize:8,color:txt2,marginBottom:2}}>{d.lb}</div>
+                    <div style={{fontSize:11,fontWeight:900,color:gold,lineHeight:1.2}}>{d.pen>=1000?(d.pen/1000).toFixed(1)+'K':fmt(d.pen)}</div>
+                    <div style={{fontSize:7.5,color:grn,fontWeight:700,marginTop:2}}>+{fmt(d.gain)}</div>
+                  </div>
+                ))}
               </div>
             </div>
           );
