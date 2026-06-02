@@ -1695,8 +1695,10 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
       </div>
 
       {/* ── معدل الاستبدال — Replacement Rate ── */}
-      {pen.f>0&&ps.lS>0&&(()=>{
-        const rate=pen.f/ps.lS*100;
+      {ps.lS>0&&ps.tM>0&&(()=>{
+        const penF=pen.f>0?pen.f:Math.max(1983.75,+(ps.nM*Math.min(ps.lS,45000)/480+ps.oM*Math.min(ps.lS,45000)/600).toFixed(0));
+        const isEst=pen.f===0;
+        const rate=penF/ps.lS*100;
         const rateClr=rate>=70?grn:rate>=50?org:red;
         const rateBg=rate>=70?grnL:rate>=50?orgL:redL;
         return(
@@ -1717,7 +1719,7 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
             <div style={{marginBottom:14}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:3,fontSize:10}}>
                 <span style={{color:txt2,fontWeight:600}}>المعاش التقاعدي</span>
-                <span style={{fontWeight:800,color:rateClr}}>{fmt(pen.f)} ر.س</span>
+                <span style={{fontWeight:800,color:rateClr}}>{fmt(penF)} ر.س{isEst&&<span style={{fontSize:8,fontWeight:400,color:txt2}}> (تقدير)</span>}</span>
               </div>
               <div style={{height:13,background:'#E2E8F0',borderRadius:8,overflow:'hidden'}}>
                 <div style={{width:`${Math.min(100,rate).toFixed(1)}%`,height:'100%',background:rateClr,borderRadius:8,transition:'width 0.5s ease'}}/>
@@ -1727,6 +1729,7 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
             <div style={{background:rateBg,borderRadius:14,padding:'14px',textAlign:'center',border:`1.5px solid ${rateClr}35`}}>
               <div style={{fontSize:44,fontWeight:900,color:rateClr,lineHeight:1}}>{rate.toFixed(0)}%</div>
               <div style={{fontSize:10,color:txt2,marginTop:4}}>معدل الاستبدال (Replacement Rate)</div>
+              {isEst&&<div style={{fontSize:8,color:txt2,marginTop:3}}>تقدير مبسط — أدخل أجور آخر 24 شهر للحساب الدقيق</div>}
               <div style={{fontSize:9,color:rateClr,marginTop:6,fontWeight:600,lineHeight:1.7}}>
                 {rate>=70?'ممتاز — معاشك يغطي معظم مصاريفك الحالية':
                  rate>=50?'متوسط — يُنصح بزيادة الاشتراكات لرفع المعاش':
@@ -2082,11 +2085,12 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
         })()}
 
         {/* ── رسم نمو المعاش بزيادة سنوات الخدمة ── */}
-        {pen.f>0&&ps.lS>0&&(()=>{
+        {ps.tM>0&&ps.lS>0&&(()=>{
+          const penBase=pen.f>0?pen.f:Math.max(1983.75,+(ps.nM*Math.min(ps.lS,45000)/480+ps.oM*Math.min(ps.lS,45000)/600).toFixed(0));
           const addPM=Math.min(ps.lS,45000)/480;
           const pts=[0,12,24,36,60,120].map(m=>({
             m,lb:m===0?'الآن':m===12?'+سنة':m===24?'+2س':m===36?'+3س':m===60?'+5س':'+10س',
-            pen:Math.max(1983.75,+(pen.f+m*addPM).toFixed(0)),
+            pen:Math.max(1983.75,+(penBase+m*addPM).toFixed(0)),
             gain:+(m*addPM).toFixed(0),
           }));
           const maxPen=pts[pts.length-1].pen;
