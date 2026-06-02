@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 
 const age=(bd)=>{if(!bd)return{g:0,h:0};const g=(Date.now()-new Date(bd))/(365.25*864e5);return{g:+(g).toFixed(1),h:+(g*1.03069).toFixed(1)}};
 const ageAt=(bd,td)=>{if(!bd||!td)return{g:0,h:0};const g=(new Date(td)-new Date(bd))/(365.25*864e5);return{g:+(g).toFixed(1),h:+(g*1.03069).toFixed(1)}};
@@ -234,105 +234,261 @@ export default function App(){
     }));
   },[pen.f,ps.lS]);
 
-  // ── استخراج تقرير PDF ──────────────────────────────────────────
+  // ── استخراج تقرير PDF (تصميم احترافي) ─────────────────────────
   const printReport=()=>{
     const tStr=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
-    const bdStr=info.bd?`${new Date(info.bd).toLocaleDateString('ar-SA')} — ${fmtHijri(info.bd)}`:'—';
-    const rdStr=info.rd?`${new Date(info.rd).toLocaleDateString('ar-SA')} — ${fmtHijri(info.rd)}`:'—';
+    const bdStr=info.bd?`${new Date(info.bd).toLocaleDateString('ar-SA')} (${fmtHijri(info.bd)})`:'—';
+    const rdStr=info.rd?`${new Date(info.rd).toLocaleDateString('ar-SA')} (${fmtHijri(info.rd)})`:'—';
     const ageStr=info.bd?`${age(info.bd).g} م / ${age(info.bd).h} هـ`:'—';
+    // penToday simplified
+    const todayISO=new Date().toISOString().split('T')[0];
+    let tO=0,tN=0,tV=0;
+    periods.filter(p=>p.st!=='مستبعد'&&p.sd&&new Date(p.sd)<=new Date(todayISO)).forEach(p=>{
+      const raw=p.ac?todayISO:(p.ed||'');const e=raw>todayISO?todayISO:raw;
+      if(!e)return;const c=mdfCal(p.sd,e,p.cal||'g');const m=c.t;
+      if(p.sy==='اشتراك اختياري')tV+=m;
+      else if(!p.sy.includes('تقاعد')){new Date(p.sd)<new Date('2001-04-25')?tO+=m:tN+=m;}
+    });
+    const capT=s60?Math.min(ps.lS,Math.min(s60*1.5,45000)):Math.min(ps.lS,45000);
+    const penTodayVal=Math.max(0,+(tO*capT/600+tN*capT/480+tV*capT/480).toFixed(0));
+    // SVG Gauge
+    const gR=52,gCX=68,gCY=70,gW=136,gH=105;
+    const gSA=Math.PI*0.72,gEA=Math.PI*2.28,gRng=gEA-gSA;
+    const gFA=gSA+gRng*(readiness/100);
+    const gAP=(a1,a2,r)=>{const x1=(gCX+r*Math.cos(a1)).toFixed(1),y1=(gCY+r*Math.sin(a1)).toFixed(1),x2=(gCX+r*Math.cos(a2)).toFixed(1),y2=(gCY+r*Math.sin(a2)).toFixed(1),la=(a2-a1)>Math.PI?1:0;return`M${x1} ${y1} A${r} ${r} 0 ${la} 1 ${x2} ${y2}`;};
+    const gClr=readiness>=70?'#059669':readiness>=40?'#D97706':'#EF4444';
+    const gSegs=[{f:gSA,t:gSA+gRng*0.4,c:'#FCA5A5'},{f:gSA+gRng*0.4,t:gSA+gRng*0.7,c:'#FCD34D'},{f:gSA+gRng*0.7,t:gEA,c:'#6EE7B7'}];
+    const gSvg=`<svg viewBox="0 0 ${gW} ${gH}" width="${gW}" height="${gH}">${gSegs.map(s=>`<path d="${gAP(s.f,s.t,gR)}" fill="none" stroke="${s.c}" stroke-width="10" stroke-linecap="butt" opacity="0.45"/>`).join('')}${readiness>0?`<path d="${gAP(gSA,gFA,gR)}" fill="none" stroke="${gClr}" stroke-width="10" stroke-linecap="round"/>`:''}
+<text x="${gCX}" y="${gCY-10}" text-anchor="middle" font-size="28" font-weight="900" fill="${gClr}" font-family="Cairo,sans-serif">${readiness}</text>
+<text x="${gCX}" y="${gCY+7}" text-anchor="middle" font-size="9" fill="#9CA3AF" font-family="Cairo,sans-serif">من 100</text>
+<text x="${gCX}" y="${gCY+23}" text-anchor="middle" font-size="9" fill="${gClr}" font-weight="700" font-family="Cairo,sans-serif">${readiness>=70?'ممتاز ✓':readiness>=50?'جيد':readiness>=30?'متوسط':'يحتاج تطوير'}</text></svg>`;
+    // SVG Donut
+    const dSl=[{lb:'فترة قديمة',val:pen.actMode?0:pen.pO,clr:'#D97706'},{lb:'فترة جديدة',val:pen.actMode?0:pen.pN,clr:'#3B82F6'},{lb:'بدل إعالة',val:pen.actMode?0:pen.dA,clr:'#10B981'},{lb:'اشتراك اختياري',val:pen.pV,clr:'#7C3AED'},{lb:'معاش مدني/عسكري',val:pen.pC,clr:'#0891B2'}].filter(s=>s.val>0);
+    const dTot=dSl.reduce((s,x)=>s+x.val,0)||1;
+    const dCX=55,dCY=55,dR=40,dIR=24,dW=110;
+    let dAng=-Math.PI/2;
+    const dPaths=dSl.map(s=>{const sw=s.val/dTot*Math.PI*2,sa=dAng,ea=sa+sw;dAng=ea;const px=(v,r)=>(dCX+r*Math.cos(v)).toFixed(1),py=(v,r)=>(dCY+r*Math.sin(v)).toFixed(1),la=sw>Math.PI?1:0;return`<path d="M${px(sa,dR)} ${py(sa,dR)} A${dR} ${dR} 0 ${la} 1 ${px(ea,dR)} ${py(ea,dR)} L${px(ea,dIR)} ${py(ea,dIR)} A${dIR} ${dIR} 0 ${la} 0 ${px(sa,dIR)} ${py(sa,dIR)} Z" fill="${s.clr}" stroke="white" stroke-width="1.5"/>`;}).join('');
+    const dSvg=`<svg viewBox="0 0 ${dW} ${dW}" width="${dW}" height="${dW}">${dPaths}<circle cx="${dCX}" cy="${dCY}" r="${dIR-1}" fill="white"/><text x="${dCX}" y="${dCY-4}" text-anchor="middle" font-size="7" fill="#9CA3AF" font-family="Cairo,sans-serif">الإجمالي</text><text x="${dCX}" y="${dCY+9}" text-anchor="middle" font-size="9" font-weight="900" fill="#059669" font-family="Cairo,sans-serif">${fI(Math.round(pen.f))}</text></svg>`;
+    // SVG Bars
+    const bBars=[{lb:'معاش الآن',val:penTodayVal,clr:'#94A3B8'},{lb:'عند التقاعد',val:pen.f,clr:'#059669'}];
+    const bMxV=Math.max(...bBars.map(b=>b.val),1);
+    const bBW=38,bGp=20,bPT=16,bCH=64,bPB=22,bSX=12;
+    const bTW=bSX*2+bBars.length*(bBW+bGp)-bGp;
+    const bSvg=`<svg viewBox="0 0 ${bTW} ${bPT+bCH+bPB+8}" width="${bTW}" height="${bPT+bCH+bPB+8}">${bBars.map((b,i)=>{const x=bSX+i*(bBW+bGp),h=Math.max(4,(b.val/bMxV)*bCH),y=bPT+bCH-h;return`<rect x="${x}" y="${y}" width="${bBW}" height="${h}" rx="4" fill="${b.clr}" opacity="0.88"/><text x="${x+bBW/2}" y="${y-4}" text-anchor="middle" font-size="7.5" font-weight="700" fill="${b.clr}" font-family="Cairo,sans-serif">${b.val>=1000?(b.val/1000).toFixed(1)+'K':b.val}</text><text x="${x+bBW/2}" y="${bPT+bCH+14}" text-anchor="middle" font-size="7" fill="#6B7280" font-family="Cairo,sans-serif">${b.lb}</text>`;}).join('')}<line x1="${bSX}" y1="${bPT+bCH}" x2="${bSX+bTW}" y2="${bPT+bCH}" stroke="#E5E7EB" stroke-width="0.8"/></svg>`;
+    // Service rows
+    const sysClr={'تقاعد عسكري':'#7C3AED','تقاعد مدني':'#3B82F6','اشتراك اختياري':'#059669'};
     const prRows=periods.filter(p=>p.st!=='مستبعد'&&p.sd).map((p,i)=>{
       const e=p.ac?new Date().toISOString().split('T')[0]:p.ed;
       const c=mdfCal(p.sd,e,p.cal||'g');
-      return`<tr><td>${i+1}</td><td>${p.emp||'—'}</td><td>${p.sd}</td><td>${p.ed||'مستمر'}</td><td>${c.m} شهر</td><td>${p.sy}</td><td>${fI(p.sl)} ر.س</td></tr>`;
+      const sc=sysClr[p.sy]||'#D97706';
+      return`<tr style="background:${i%2===0?'white':'#FAFAFA'}"><td style="padding:7px 10px;color:#374151;font-weight:600">${i+1}</td><td style="padding:7px 10px;color:#111827;font-weight:600">${p.emp||'—'}</td><td style="padding:7px 10px;color:#6B7280;font-size:8.5pt;direction:ltr">${p.sd}</td><td style="padding:7px 10px;color:#6B7280;font-size:8.5pt;direction:ltr">${p.ed||'مستمر'}</td><td style="padding:7px 10px;font-weight:700;color:#059669">${c.m} ش</td><td style="padding:7px 10px"><span style="background:${sc}18;color:${sc};padding:2px 8px;border-radius:20px;font-size:8pt;font-weight:700;border:1px solid ${sc}30">${p.sy}</span></td><td style="padding:7px 10px;font-weight:700;text-align:left;direction:ltr">${fI(p.sl)} ر.س</td></tr>`;
     }).join('');
-    const penRows=[
-      ps.oM>0?`<tr><td>فترة قديمة ÷ 600</td><td>${ps.oM} شهر</td><td>${fmt(pen.pO)} ر.س</td></tr>`:'',
-      `<tr><td>فترة جديدة ÷ 480</td><td>${ps.nM} شهر</td><td>${fmt(pen.pN)} ر.س</td></tr>`,
-      pen.dA>0?`<tr><td>بدل إعالة (${deps} معال)</td><td>—</td><td>+${fmt(pen.dA)} ر.س</td></tr>`:'',
-      pen.pV>0?`<tr><td>اشتراك اختياري</td><td>${ps.vM} شهر</td><td>+${fmt(pen.pV)} ر.س</td></tr>`:'',
-      pen.pC>0?`<tr><td>معاش مدني/عسكري</td><td>${tf.cM} شهر</td><td>+${fmt(pen.pC)} ر.س</td></tr>`:'',
-    ].filter(Boolean).join('');
-    const html=`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    // Pension calc rows
+    const penCalcRows=pen.actMode?[
+      {lb:`معاش اكتواري — ${tf.tY.toFixed(1)} سنة × معامل ${tf.act.final}`,val:pen.pC,clr:'#7C3AED',plus:false},
+      ...(pen.pV>0?[{lb:'الاشتراك الاختياري',val:pen.pV,clr:'#7C3AED',plus:true}]:[]),
+    ]:[
+      ...(ps.oM>0?[{lb:`الفترة القديمة — ${ps.oM} شهر ÷ 600 × ${fmt(r150.app)} ر.س`,val:pen.pO,clr:'#D97706',plus:false}]:[]),
+      {lb:`الفترة الجديدة — ${ps.nM} شهر ÷ 480 × ${fmt(r150.app)} ر.س`,val:pen.pN,clr:'#3B82F6',plus:false},
+      ...(pen.dA>0?[{lb:`بدل إعالة — ${deps} معالين (${deps>=3?20:deps===2?15:10}%)`,val:pen.dA,clr:'#10B981',plus:true}]:[]),
+      ...(pen.pV>0?[{lb:'الاشتراك الاختياري',val:pen.pV,clr:'#7C3AED',plus:true}]:[]),
+      ...(pen.pC>0?[{lb:`معاش مدني/عسكري — ${tf.cM} شهر`,val:pen.pC,clr:'#0891B2',plus:true}]:[]),
+    ];
+    const penRows=penCalcRows.map((row,i)=>`<tr style="background:${i%2===0?'white':'#FAFAFA'}"><td style="padding:8px 11px;color:#4B5563;font-size:9pt">${row.lb}</td><td style="padding:8px 11px;font-weight:800;color:${row.clr};text-align:left;direction:ltr;font-size:10.5pt">${row.plus?'+':''}${fmt(row.val)} <span style="font-size:7.5pt;font-weight:400;color:#9CA3AF">ر.س</span></td></tr>`).join('');
+    const html=`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-@page{size:A4 portrait;margin:14mm 18mm}
-*{font-family:'Tajawal',sans-serif;box-sizing:border-box;margin:0;padding:0}
-body{font-size:9.5pt;color:#111;direction:rtl;line-height:1.55}
-.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2pt solid #059669;padding-bottom:7pt;margin-bottom:12pt}
-h1{font-size:16pt;color:#059669;font-weight:900}
-h2{font-size:10.5pt;color:#059669;font-weight:800;margin:9pt 0 5pt;border-right:3pt solid #059669;padding-right:6pt}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:7pt;margin-bottom:9pt}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7pt;margin-bottom:9pt}
-.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6pt;margin-bottom:9pt}
-.c{border:.5pt solid #E5E7EB;border-radius:4pt;padding:6pt 9pt}
-.lbl{font-size:7pt;color:#6B7280;margin-bottom:2pt}
-.val{font-size:10pt;font-weight:700;color:#0C1F14}
-.vg{color:#059669}
-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:9pt}
-th{background:#059669;color:#fff;padding:4pt 6pt;text-align:right;font-weight:700;font-size:8pt}
-td{padding:3.5pt 6pt;border-bottom:.5pt solid #F3F4F6}
-tr:nth-child(even) td{background:#F9FAFB}
-tfoot td{font-weight:700;background:#ECFDF5;color:#059669}
-.pbox{background:#ECFDF5;border:1pt solid #059669;border-radius:5pt;padding:9pt;text-align:center;margin:8pt 0}
-.pamt{font-size:24pt;font-weight:900;color:#059669}
-.note{font-size:7pt;color:#6B7280;border:.5pt solid #E5E7EB;border-radius:4pt;padding:5pt 8pt;margin-top:8pt;line-height:1.7}
+@page{size:A4 portrait;margin:0}
+*{font-family:'Cairo',sans-serif;box-sizing:border-box;margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+body{font-size:10pt;color:#111827;direction:rtl;line-height:1.6;background:white}
+.hdr{background:linear-gradient(135deg,#022C22 0%,#065F46 50%,#059669 100%);padding:24px 30px;position:relative;overflow:hidden}
+.hdr-in{display:flex;justify-content:space-between;align-items:flex-end;position:relative;z-index:1}
+.hdr h1{font-size:22pt;font-weight:900;color:white;margin:4px 0 0;letter-spacing:-0.3px}
+.hdr .sub{font-size:8pt;color:rgba(255,255,255,0.6);letter-spacing:0.8px}
+.hdr-badge{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;text-align:center}
+.hdr-badge .d{font-size:7pt;color:rgba(255,255,255,0.6);margin-bottom:2px}
+.hdr-badge .v{font-size:10pt;color:white;font-weight:700}
+.body{padding:20px 26px}
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}
+.sc{background:white;border:1px solid #E5E7EB;border-radius:11px;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+.sc .l{font-size:7pt;color:#9CA3AF;margin-bottom:3px;font-weight:500}
+.sc .v{font-size:14pt;font-weight:900;color:#059669;line-height:1.1}
+.sc .s{font-size:6.5pt;color:#9CA3AF;margin-top:2px}
+.sc.hl{background:linear-gradient(135deg,#065F46,#059669);border:none}
+.sc.hl .l,.sc.hl .s{color:rgba(255,255,255,0.65)}
+.sc.hl .v{color:white;font-size:17pt}
+.sb{border-radius:10px;padding:11px 15px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.sb.ok{background:#ECFDF5;border:1.5px solid #059669}.sb.ok h3{color:#065F46;font-size:10pt;font-weight:800}.sb.ok p{color:#047857;font-size:8pt;margin-top:1px}
+.sb.warn{background:#FFFBEB;border:1.5px solid #D97706}.sb.warn h3{color:#92400E;font-size:10pt;font-weight:800}.sb.warn p{color:#B45309;font-size:8pt;margin-top:1px}
+.sb .ic{font-size:18pt;flex-shrink:0}
+.cr{display:flex;gap:11px;margin-bottom:14px;align-items:flex-start}
+.cc{background:white;border:1px solid #E5E7EB;border-radius:11px;padding:12px 10px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.cc h4{font-size:8pt;color:#4B5563;font-weight:700;margin-bottom:8px}
+.lg{display:flex;flex-direction:column;gap:4px}
+.li{display:flex;align-items:center;gap:5px;font-size:7pt}
+.ld{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.lv{margin-right:auto;font-weight:700;color:#374151}
+table{width:100%;border-collapse:collapse}
+th{background:#065F46;color:white;padding:7px 10px;text-align:right;font-size:8pt;font-weight:700}
+td{border-bottom:1px solid #F3F4F6}
+tr:last-child td{border-bottom:none}
+.tw{border-radius:9px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:13px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+tfoot td{background:#ECFDF5;font-weight:800;color:#059669;padding:8px 10px;border-top:1.5px solid #059669}
+.ph{background:linear-gradient(135deg,#022C22,#065F46 50%,#059669);border-radius:13px;padding:18px;text-align:center;margin-bottom:13px}
+.ph .t{font-size:7.5pt;color:rgba(255,255,255,0.6);letter-spacing:1.5px;margin-bottom:4px}
+.ph .a{font-size:32pt;font-weight:900;color:white;line-height:1}
+.ph .c{font-size:9pt;color:rgba(255,255,255,0.55);margin-top:2px}
+.ph .b{background:rgba(255,255,255,0.12);border-radius:20px;display:inline-block;padding:3px 12px;font-size:8pt;color:rgba(255,255,255,0.82);margin-top:6px}
+.sec{font-size:10.5pt;font-weight:800;color:#065F46;margin:14px 0 9px;display:flex;align-items:center;gap:8px;padding-right:9px;border-right:3.5px solid #059669}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:12px}
+.ic2{background:white;border:1px solid #E5E7EB;border-radius:9px;padding:11px}
+.ir{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F9FAFB;font-size:8.5pt}
+.ir:last-child{border:none}
+.ir .k{color:#6B7280}.ir .val{font-weight:700;color:#111827}
+.prgb{background:#E5E7EB;border-radius:8px;height:8px;overflow:hidden;margin:5px 0 3px}
+.prg{height:100%;border-radius:8px}
+.disc{background:#F9FAFB;border-radius:8px;padding:9px 12px;font-size:7.5pt;color:#6B7280;line-height:1.9;border:1px solid #E5E7EB;margin-top:12px}
+.ftr{margin-top:13px;padding-top:9px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;font-size:7pt;color:#9CA3AF}
 .pg{page-break-after:always}
-.ftr{margin-top:12pt;padding-top:5pt;border-top:.5pt solid #E5E7EB;font-size:7pt;color:#9CA3AF;display:flex;justify-content:space-between}
-.badge{display:inline-block;border-radius:20pt;padding:1.5pt 7pt;font-size:7.5pt;font-weight:700}
-.bg{background:#ECFDF5;color:#059669;border:.5pt solid #059669}
-.br{background:#FEF2F2;color:#EF4444;border:.5pt solid #EF4444}
-</style></head><body>
+</style>
+</head>
+<body>
 <div class="hdr">
-  <div><h1>تقرير المعاش التقاعدي</h1><div style="font-size:8pt;color:#6B7280;margin-top:2pt">المؤسسة العامة للتأمينات الاجتماعية • نظام م/33 • تبادل المنافع م/53 • تعديلات 3/7/2024م</div></div>
-  <div style="text-align:left;font-size:8pt;color:#6B7280">${tStr}</div>
+  <div style="position:absolute;top:-50px;right:-50px;width:180px;height:180px;background:radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%);z-index:0"></div>
+  <div style="position:absolute;bottom:-30px;left:-30px;width:140px;height:140px;background:radial-gradient(circle,rgba(255,255,255,0.05),transparent 70%);z-index:0"></div>
+  <div class="hdr-in">
+    <div>
+      <div class="sub">المؤسسة العامة للتأمينات الاجتماعية • نظام م/33 • تعديلات 3 يوليو 2024م</div>
+      <h1>تقرير المعاش التقاعدي</h1>
+      <div class="sub" style="margin-top:5px">تبادل المنافع م/53 • نظام الاحتساب الاكتواري</div>
+    </div>
+    <div class="hdr-badge">
+      <div class="d">تاريخ الإصدار</div>
+      <div class="v">${tStr}</div>
+    </div>
+  </div>
 </div>
-<h2>البيانات الشخصية</h2>
-<div class="g3">
-  <div class="c"><div class="lbl">تاريخ الميلاد</div><div class="val">${bdStr}</div></div>
-  <div class="c"><div class="lbl">العمر الحالي</div><div class="val">${ageStr}</div></div>
-  <div class="c"><div class="lbl">تاريخ التقاعد المخطط</div><div class="val">${rdStr}</div></div>
+<div class="body">
+<div class="sum-grid">
+  <div class="sc hl"><div class="l">المعاش التقاعدي المتوقع</div><div class="v">${fmt(pen.f)}</div><div class="s">ريال سعودي / شهر</div></div>
+  <div class="sc"><div class="l">إجمالي مدة الخدمة</div><div class="v">${Math.floor(ps.tM/12)}</div><div class="s">${ps.tM} شهر — ${(ps.tM/12).toFixed(1)} سنة</div></div>
+  <div class="sc"><div class="l">سن التقاعد النظامي</div><div class="v" style="font-size:11pt">${ri.lb}</div><div class="s">${ri.dt?ri.dt.toLocaleDateString('ar-SA'):'—'}</div></div>
+  <div class="sc"><div class="l">التقاعد المبكر</div><div class="v" style="color:${ps.tM>=ri.eR?'#059669':'#EF4444'};font-size:11pt">${ps.tM>=ri.eR?'✓ مؤهل':'غير مؤهل'}</div><div class="s">${ps.tM}/${ri.eR} شهر</div></div>
 </div>
-<h2>مدد الخدمة</h2>
-<table><thead><tr><th>#</th><th>جهة العمل</th><th>من</th><th>إلى</th><th>المدة</th><th>النظام</th><th>الأجر</th></tr></thead>
-<tbody>${prRows||'<tr><td colspan="7" style="text-align:center;color:#9CA3AF">لا توجد مدد</td></tr>'}</tbody>
-<tfoot><tr><td colspan="4">الإجمالي</td><td>${ps.tM} شهر (${(ps.tM/12).toFixed(1)} سنة)</td><td>—</td><td>${fI(ps.lS)} ر.س</td></tr></tfoot></table>
-<h2>الوضع التأميني — قرار 3/7/2024م</h2>
-<div class="g4">
-  <div class="c"><div class="lbl">العمر الهجري في 3/7/2024</div><div class="val">${ri.aRH?`${ri.aRH.yrs}س ${ri.aRH.mths}ش هجري`:`${ri.aR} سنة`}</div></div>
-  <div class="c"><div class="lbl">الخدمة في 3/7/2024</div><div class="val">${psAtRF.tM} شهر</div></div>
-  <div class="c"><div class="lbl">سن التقاعد النظامي</div><div class="val vg">${ri.lb}</div></div>
-  <div class="c"><div class="lbl">تاريخ التقاعد النظامي</div><div class="val">${ri.dt?ri.dt.toLocaleDateString('ar-SA'):'—'}</div></div>
+<div class="sb ${ps.tM>=ri.eR?'ok':'warn'}">
+  <div class="ic">${ps.tM>=ri.eR?'✅':'📋'}</div>
+  <div><h3>${ps.tM>=ri.eR?'مؤهل للتقاعد المبكر':'جارٍ استكمال شروط التقاعد المبكر'}</h3>
+  <p>${ps.tM>=ri.eR?`استكملت ${ps.tM} شهراً من أصل ${ri.eR} — بإمكانك التقاعد مبكراً الآن`:`متبقٍ ${ri.eR-ps.tM} شهراً لاستيفاء شرط التقاعد المبكر البالغ ${ri.eR} شهراً`}</p></div>
 </div>
-<div class="c" style="margin-bottom:9pt;${ps.tM>=ri.eR?'background:#ECFDF5;border-color:#059669':'background:#FEF2F2;border-color:#EF4444'}">
-  <span class="lbl">التقاعد المبكر (${ri.eR} شهر): </span>
-  <span class="val" style="color:${ps.tM>=ri.eR?'#059669':'#EF4444'}">${ps.tM>=ri.eR?`✓ مؤهل — ${ps.tM} شهر`:`ينقص ${ri.eR-ps.tM} شهر (المتحقق: ${ps.tM} شهر)`}</span>
+<div class="cr">
+  <div class="cc" style="text-align:center;min-width:150px;flex:0 0 auto">
+    <h4>مؤشر الجاهزية للتقاعد</h4>
+    <div style="display:flex;justify-content:center">${gSvg}</div>
+    <div class="prgb"><div class="prg" style="width:${readiness}%;background:${gClr}"></div></div>
+    <div style="font-size:6.5pt;color:#9CA3AF">خدمة (60) + كفاية المعاش (40)</div>
+  </div>
+  <div class="cc" style="flex:1">
+    <h4>توزيع مكونات المعاش (ريال / شهر)</h4>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div>${dSvg}</div>
+      <div class="lg" style="flex:1">
+        ${dSl.map(s=>`<div class="li"><div class="ld" style="background:${s.clr}"></div><span style="color:#6B7280;flex:1">${s.lb}</span><span class="lv">${fmt(s.val)}</span></div>`).join('')}
+        <div class="li" style="margin-top:4px;padding-top:4px;border-top:1px solid #E5E7EB"><div class="ld" style="background:#059669"></div><strong style="flex:1">الإجمالي</strong><strong class="lv" style="color:#059669">${fmt(pen.f)}</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="cc" style="text-align:center;min-width:128px;flex:0 0 auto">
+    <h4>مقارنة المعاش</h4>
+    <div style="display:flex;justify-content:center">${bSvg}</div>
+    ${penTodayVal>0&&pen.f>penTodayVal?`<div style="background:#ECFDF5;border-radius:6px;padding:3px 8px;margin-top:4px;font-size:7.5pt;font-weight:700;color:#059669">+${fmt(pen.f-penTodayVal)} ر.س</div>`:''}
+  </div>
+</div>
+<div class="ph">
+  <div class="t">المعاش التقاعدي المتوقع عند تاريخ التقاعد المخطط</div>
+  <div class="a">${fmt(pen.f)}</div>
+  <div class="c">ريال سعودي / شهر</div>
+  <div class="b">الأجر المعتمد: ${fmt(pen.a)} ر.س &nbsp;•&nbsp; مدة: ${(ps.tM/12).toFixed(1)} سنة</div>
+</div>
+<div class="sec">📋 البيانات الشخصية والتقاعدية</div>
+<div class="two">
+  <div class="ic2">
+    <div class="ir"><span class="k">تاريخ الميلاد</span><span class="val">${bdStr}</span></div>
+    <div class="ir"><span class="k">العمر الحالي</span><span class="val">${ageStr}</span></div>
+    <div class="ir"><span class="k">تاريخ التقاعد المخطط</span><span class="val">${rdStr}</span></div>
+    ${info.bd&&info.rd?`<div class="ir"><span class="k">العمر عند التقاعد</span><span class="val">${ageAt(info.bd,info.rd).g} م</span></div>`:''}
+    <div class="ir"><span class="k">عدد المعالين</span><span class="val">${deps} معال${deps===0?' (لا إعالة)':deps===1?' (+10%)':deps===2?' (+15%)':' (+20%)'}</span></div>
+  </div>
+  <div class="ic2">
+    <div class="ir"><span class="k">وضع 3/7/2024م</span><span class="val" style="color:${ri.ex?'#059669':'#D97706'}">${ri.ex?'✓ مُعفى':'مشمول بالتعديلات'}</span></div>
+    <div class="ir"><span class="k">العمر الهجري في 3/7/2024</span><span class="val">${ri.aRH?ri.aRH.yrs+'س '+ri.aRH.mths+'ش':ri.aR+' س'} هجري</span></div>
+    <div class="ir"><span class="k">سن التقاعد النظامي</span><span class="val">${ri.lb}</span></div>
+    <div class="ir"><span class="k">تاريخ التقاعد النظامي</span><span class="val">${ri.dt?ri.dt.toLocaleDateString('ar-SA'):'—'}</span></div>
+    <div class="ir"><span class="k">شرط التقاعد المبكر</span><span class="val">${ri.eR} شهر (${ri.eY} سنة)</span></div>
+  </div>
+</div>
 </div>
 <div class="pg"></div>
-<h2>المعاش التقاعدي المتوقع</h2>
-<div class="pbox"><div class="lbl">عند تاريخ التقاعد المخطط</div><div class="pamt">${fmt(pen.f)} <span style="font-size:11pt">ريال / شهر</span></div><div class="lbl">الأجر المعتمد: ${fmt(pen.a)} ر.س</div></div>
-<h2>تفاصيل الاحتساب</h2>
-<table><thead><tr><th>البند</th><th>التفاصيل</th><th>القيمة</th></tr></thead>
-<tbody>${penRows||'<tr><td colspan="3" style="text-align:center;color:#9CA3AF">—</td></tr>'}</tbody>
-<tfoot><tr><td>الإجمالي</td><td>${ps.tM} شهر (${(ps.tM/12).toFixed(1)} سنة)</td><td>${fmt(pen.f)} ر.س / شهر</td></tr></tfoot></table>
-${tf.has?`<h2>تبادل المنافع — م/53</h2><div class="g4">
-  <div class="c"><div class="lbl">آخر راتب مدني</div><div class="val">${fI(tf.cS)} ر.س</div></div>
-  <div class="c"><div class="lbl">مدة مدنية</div><div class="val">${tf.cY.toFixed(1)} سنة</div></div>
-  <div class="c"><div class="lbl">معامل اكتواري</div><div class="val">${tf.act.final}</div></div>
-  <div class="c"><div class="lbl">إجمالي المدة</div><div class="val">${tf.tY.toFixed(1)} سنة</div></div>
-</div>`:''}
-${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;margin-bottom:9pt"><span class="lbl" style="color:#7C3AED">وضع الاحتساب: </span><span class="val" style="color:#7C3AED">${pen.isMerged?'ضم المدة — احتساب اكتواري موحّد':'التخصيص والتحول — احتساب اكتواري'}</span></div>`:''}
-<div class="note">
-  <strong>المراجع:</strong> نظام التأمينات الاجتماعية م/33 (1421هـ) المادة 38 &nbsp;•&nbsp; نظام تبادل المنافع م/53 (1424هـ) &nbsp;•&nbsp; قرار مجلس الوزراء 3/7/2024م البند خامساً &nbsp;•&nbsp; المادة 24 من لائحة التسجيل والاشتراكات.<br>
-  <strong>تنبيه:</strong> الأرقام الواردة في هذا التقرير تقديرية وتستند إلى البيانات المدخلة، ولا تُعدّ وثيقة رسمية.
+<div class="body" style="padding-top:16px">
+<div class="sec">💼 مدد الخدمة</div>
+<div class="tw">
+  <table>
+    <thead><tr><th>#</th><th>جهة العمل</th><th>من</th><th>إلى</th><th>المدة</th><th>النظام</th><th>الأجر</th></tr></thead>
+    <tbody>${prRows||'<tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:14px">لا توجد مدد مدخلة</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="4">الإجمالي</td><td>${ps.tM} ش — ${(ps.tM/12).toFixed(1)} سنة</td><td>—</td><td style="text-align:left;direction:ltr">${fI(ps.lS)} ر.س</td></tr></tfoot>
+  </table>
 </div>
-<div class="ftr"><div>حاسبة التقاعد — المؤسسة العامة للتأمينات الاجتماعية</div><div>${tStr}</div></div>
-</body></html>`;
-    const w=window.open('','_blank','width=900,height=700');
+${ri.eR>0?`<div style="margin-bottom:13px">
+  <div style="display:flex;justify-content:space-between;font-size:8.5pt;margin-bottom:4px">
+    <span style="color:#4B5563;font-weight:600">نسبة استيفاء شرط التقاعد المبكر (${ri.eR} شهر)</span>
+    <span style="color:#059669;font-weight:800">${Math.min(100,Math.round(psAtRF.tM/ri.eR*100))}%</span>
+  </div>
+  <div class="prgb"><div class="prg" style="width:${Math.min(100,psAtRF.tM/ri.eR*100).toFixed(0)}%;background:linear-gradient(90deg,${psAtRF.tM>=ri.eR?'#34D399,#059669':'#FCD34D,#D97706'})"></div></div>
+  <div style="display:flex;justify-content:space-between;font-size:7pt;color:#9CA3AF;margin-top:2px"><span>0</span><span style="color:#4B5563;font-weight:600">${psAtRF.tM} من ${ri.eR} شهر</span><span>${ri.eR} شهر</span></div>
+</div>`:''}
+<div class="sec">📊 تفاصيل احتساب المعاش</div>
+<div class="tw">
+  <table>
+    <thead><tr><th style="width:70%">البند</th><th style="text-align:left">القيمة</th></tr></thead>
+    <tbody>${penRows||'<tr><td colspan="2" style="padding:12px;text-align:center;color:#9CA3AF">—</td></tr>'}</tbody>
+    <tfoot><tr><td>الإجمالي — ${ps.tM} شهر (${(ps.tM/12).toFixed(1)} سنة)</td><td style="font-size:12pt;text-align:left;direction:ltr">${fmt(pen.f)} ر.س / شهر</td></tr></tfoot>
+  </table>
+</div>
+${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظام م/53</div>
+<div class="ic2" style="margin-bottom:13px">
+  <div class="ir"><span class="k">النظام الأخير</span><span class="val">${tf.lastSys==='تقاعد'?'التقاعد المدني':'التأمينات الاجتماعية'}</span></div>
+  <div class="ir"><span class="k">آخر راتب مدني</span><span class="val">${fI(tf.cS)} ر.س</span></div>
+  <div class="ir"><span class="k">المدة المدنية</span><span class="val">${tf.cY.toFixed(1)} سنة (${tf.cM} شهر)</span></div>
+  <div class="ir"><span class="k">المعامل الاكتواري</span><span class="val" style="color:#3B82F6">${tf.act.final}</span></div>
+  <div class="ir"><span class="k">إجمالي المدة المدمجة</span><span class="val">${tf.tY.toFixed(1)} سنة</span></div>
+  <div class="ir"><span class="k">معاش تبادل المنافع</span><span class="val" style="color:#059669;font-size:11pt">${fmt(tf.pen)} ر.س / شهر</span></div>
+</div>`:''}
+<div class="disc">
+  <strong style="color:#374151">📌 المراجع القانونية:</strong>
+  نظام التأمينات الاجتماعية م/33 (1421هـ) المادة 38 &nbsp;•&nbsp;
+  نظام تبادل المنافع م/53 (1424هـ) &nbsp;•&nbsp;
+  قرار مجلس الوزراء 3/7/2024م البند خامساً &nbsp;•&nbsp;
+  المادة 24 من لائحة التسجيل والاشتراكات.<br>
+  <strong style="color:#374151">⚠️ تنبيه:</strong>
+  الأرقام الواردة في هذا التقرير تقديرية وتستند إلى البيانات المدخلة، ولا تُعدّ وثيقة رسمية.
+  يُنصح بمراجعة فرع التأمينات للحصول على كشف حساب رسمي.
+</div>
+<div class="ftr">
+  <div>حاسبة التقاعد — المؤسسة العامة للتأمينات الاجتماعية</div>
+  <div>${tStr}</div>
+</div>
+</div>
+</body>
+</html>`;
+    const w=window.open('','_blank','width=960,height=700');
     if(!w){alert('يرجى السماح بفتح النوافذ المنبثقة لاستخراج التقرير');return;}
     w.document.write(html);
     w.document.close();
-    if(w.document.fonts?.ready){w.document.fonts.ready.then(()=>setTimeout(()=>w.print(),300));}
-    else{setTimeout(()=>w.print(),700);}
+    if(w.document.fonts?.ready){w.document.fonts.ready.then(()=>setTimeout(()=>w.print(),500));}
+    else{setTimeout(()=>w.print(),900);}
   };
 
   // ── الثيم الفاتح العصري ──────────────────────────────────────
