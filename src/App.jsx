@@ -12,6 +12,7 @@ const _newG=(s,e)=>{const sd=new Date(s),ed=new Date(e);let tot=0,cur=new Date(s
 const mdf=(s,e)=>{if(!s||!e)return{m:0,d:0,t:0};const a=new Date(s),b=new Date(e);if(isNaN(a)||isNaN(b)||b<a)return{m:0,d:0,t:0};const tot=b<GOSI_CUT?_oldG(s,e):a>=GOSI_CUT?_newG(s,e):_oldG(s,new Date(+GOSI_CUT-864e5).toISOString().split('T')[0])+_newG('2022-02-01',e);const m=Math.floor(tot);return{m,d:Math.round((tot-m)*30),t:tot}};
 const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(n);
 const fI=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(n);
+const fMD=t=>{const m=Math.floor(t);const d=Math.round((t-m)*30);return d>0?m+' شهر و '+d+' يوم':m+' شهر';};
 const MA=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
 // ── تقويم أم القرى ──────────────────────────────────────────
@@ -35,7 +36,7 @@ const rdFromHijriAge=(bd,hYrs)=>{if(!bd||!hYrs||isNaN(hYrs)||+hYrs<=0)return'';c
 // ── شرائح الاشتراك الاختياري ─────────────────────────────────
 const BK=[1200,1400,1600,1800,2000,2200,2400,2600,2800,3000,3300,3600,3900,4200,4600,5000,5500,6000,6600,7200,7900,8600,9400,10300,11300,12400,13600,14900,16300,17800,19600,21600,23800,26200,28800,31700,34900,38400,42200,45000];
 const nextBK=c=>{const i=BK.indexOf(c);return i>=0&&i<39?BK[i+1]:c};
-const allowedBK=last=>{if(!last||last<=0)return BK;const mx=last*1.1;return BK.filter(b=>b>=last&&b<=mx).concat(BK.filter(b=>b>mx).slice(0,1))};
+const allowedBK=last=>{if(!last||last<=0)return BK;const cap=Math.min(last,45000);const mx=cap*1.1;return BK.filter(b=>b>=cap&&b<=mx).concat(BK.filter(b=>b>mx&&b<=45000).slice(0,1))};
 
 // ── الجدول الاكتواري م/53 ─────────────────────────────────────
 const AT={1:1.04,2:1.0816,3:1.12486,4:1.16986,5:1.21665,6:1.26532,7:1.31593,8:1.36857,9:1.42331,10:1.48024,11:1.53945,12:1.60103,13:1.66507,14:1.73168,15:1.80094,16:1.87298,17:1.9479,18:2.02582,19:2.10685,20:2.19112,21:2.27877,22:2.30992,23:2.46472,24:2.5633,25:2.66584,26:2.77247,27:2.88337,28:2.9987,29:3.11865,30:3.2434,31:3.37313,32:3.50806,33:3.64838,34:3.79432,35:3.94609,36:4.10393,37:4.26809,38:4.43881,39:4.61637,40:4.80102};
@@ -132,7 +133,7 @@ export default function App(){
   },[ps,aEnd]);
 
   const avg=useMemo(()=>{const f=sals.filter(s=>s>0);return f.length?f.reduce((a,b)=>a+b,0)/f.length:0},[sals]);
-  const r150=useMemo(()=>{if(!s60)return{on:false,app:avg};const l=s60*1.5;return{on:true,l,ov:avg>l,app:avg>l?l:avg};},[s60,avg]);
+  const r150=useMemo(()=>{if(!s60)return{on:false,app:Math.min(avg,45000)};const l=Math.min(s60*1.5,45000);return{on:true,l,ov:avg>l,app:avg>l?l:avg};},[s60,avg]);
 
   const tf=useMemo(()=>{
     const cp=periods.filter(p=>(p.sy==='تقاعد مدني'||p.sy==='تقاعد عسكري')&&p.st!=='مستبعد');
@@ -205,6 +206,33 @@ export default function App(){
     const curY=new Date().getFullYear(),retY=info.rd?new Date(info.rd).getFullYear():curY+5;
     return Array.from({length:Math.max(1,retY-curY+1)},(_,i)=>{if(i>0)sal=Math.min(Math.round(sal*(1+r)),45000);return{y:curY+i,sal,emp:+(sal*.09).toFixed(0),er:+(sal*.12).toFixed(0),tot:+(sal*.21).toFixed(0)};});
   },[ps.lS,mandRaise,info.rd]);
+
+  // ── Retirement Readiness Score (0-100) ──────────────────────────
+  const readiness=useMemo(()=>{
+    if(!ps.tM&&!pen.f)return 0;
+    const svc=ri.eR>0?Math.min(60,Math.round((psAtRF.tM/ri.eR)*60)):0;
+    const penAdq=pen.f>0?Math.min(40,Math.round((pen.f/8000)*40)):0;
+    return Math.min(100,svc+penAdq);
+  },[psAtRF,pen,ri,ps]);
+
+  // ── Countdown to retirement ──────────────────────────────────────
+  const countdown=useMemo(()=>{
+    if(!info.rd)return null;
+    const ms=Math.max(0,new Date(info.rd)-Date.now());
+    const m=Math.round(ms/864e5/30.44);
+    return{m,y:Math.floor(m/12),r:m%12};
+  },[info.rd]);
+
+  // ── Pension projection across retirement timings ─────────────────
+  const projection=useMemo(()=>{
+    if(!pen.f||!ps.lS)return[];
+    const add=Math.min(ps.lS,45000)/480;
+    return[-24,-12,0,12,24,36,60].map(x=>({
+      lb:x===0?'مخطط':x>0?`+${x/12}س`:`${x/12}س`,
+      pen:Math.max(1983.75,+(pen.f+x*add).toFixed(0)),
+      cur:x===0,neg:x<0,
+    }));
+  },[pen.f,ps.lS]);
 
   // ── استخراج تقرير PDF ──────────────────────────────────────────
   const printReport=()=>{
@@ -357,7 +385,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
 
     {/* ── Tabs ── */}
     <div style={{background:'#FFFFFF',borderBottom:`1px solid ${brd}`,padding:'10px 12px',display:'flex',gap:6,position:'sticky',top:0,zIndex:20,boxShadow:'0 2px 12px rgba(0,0,0,0.06)'}}>
-      {[{id:'merged',ic:'📋',lb:'البيانات'},{id:'status',ic:'📊',lb:'الوضع التأميني'},{id:'result',ic:'✨',lb:'النتائج'},{id:'improve',ic:'💡',lb:'التحسين'}].map(t=>(
+      {[{id:'merged',ic:'📋',lb:'البيانات'},{id:'result',ic:'✨',lb:'النتائج'},{id:'improve',ic:'💡',lb:'التحسين'}].map(t=>(
         <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:'9px 4px',borderRadius:14,border:'none',background:tab===t.id?gold:'transparent',color:tab===t.id?'#FFFFFF':txt2,fontWeight:700,fontSize:9,cursor:'pointer',fontFamily:'inherit',transition:'all 0.18s',boxShadow:tab===t.id?`0 4px 14px ${gold}35`:'none'}}>
           <span style={{display:'block',fontSize:17,marginBottom:2}}>{t.ic}</span>{t.lb}
         </button>
@@ -389,6 +417,73 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
             :<><input type="date" value={info.bd} onChange={e=>{const bd=e.target.value;setInfo(p=>({...p,bd}));if(info.rd&&bd){const a=ageAt(bd,info.rd);setRetAge(a.g>0?String(a.g):'')}}} style={{...inp,direction:'ltr',textAlign:'center'}}/>
               {info.bd&&<div style={{fontSize:9,color:gold,marginTop:3,textAlign:'center'}}>{fmtHijri(info.bd)}</div>}</>
           }
+          {info.bd&&<>
+            <div style={{textAlign:'center',margin:'8px 0 6px'}}>
+              <div style={{fontSize:22,fontWeight:900,color:gold2,lineHeight:1}}>{age(info.bd).g} <span style={{fontSize:13,fontWeight:500,color:txt2}}>م</span> / {age(info.bd).h} <span style={{fontSize:13,fontWeight:500,color:txt2}}>هـ</span></div>
+            </div>
+            <div style={{borderRadius:14,overflow:'hidden',border:`1.5px solid ${ri.ex?grn:org}35`,marginBottom:8,boxShadow:`0 3px 14px ${ri.ex?grn:org}12`}}>
+              {/* شريط الحالة */}
+              <div style={{background:`linear-gradient(135deg,${ri.ex?'#065F46':gold2} 0%,${ri.ex?grn:org} 100%)`,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:20,lineHeight:1,flexShrink:0}}>{ri.ex?'✅':'📋'}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:900,color:'#fff',letterSpacing:0.1}}>{ri.ex?'غير مشمول بتعديلات 2024':'مشمول بتعديلات 2024'}</div>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,0.72)',marginTop:1,fontWeight:500}}>قرار مجلس الوزراء — 3 يوليو 2024م</div>
+                </div>
+                <div style={{background:'rgba(255,255,255,0.18)',borderRadius:8,padding:'3px 9px',fontSize:8,color:'#fff',fontWeight:700,flexShrink:0,border:'1px solid rgba(255,255,255,0.3)'}}>📜 نظام م/33</div>
+              </div>
+              {/* وضعك */}
+              <div style={{background:ri.ex?'#F0FDF4':'#FFFBEB',padding:'8px 14px',borderBottom:`1px solid ${ri.ex?grn:org}20`,display:'flex',gap:7,alignItems:'flex-start'}}>
+                <span style={{fontSize:11,flexShrink:0,marginTop:1}}>{ri.ex?'🟢':'🟡'}</span>
+                <div style={{fontSize:9,color:ri.ex?'#166534':gold2,lineHeight:1.8,fontWeight:500}}>
+                  {ri.ex
+                    ?'عمرك تجاوز 48.5 سنة هجرية أو خدمتك بلغت 240 شهراً فأكثر في تاريخ 3/7/2024م — يسري عليك النظام القديم دون تغيير.'
+                    :`عمرك في 3/7/2024م: ${ri.aRH.yrs} سنة${ri.aRH.mths>0?` و ${ri.aRH.mths} شهر`:''} هجري — تنطبق عليك التعديلات الجديدة.`}
+                </div>
+              </div>
+              {/* شرح القرار */}
+              <div style={{background:'#FAFBFC',padding:'10px 14px',borderBottom:`1px solid ${brd}`}}>
+                <div style={{fontSize:9,color:'#4B5563',lineHeight:2}}>
+                  أقرّ مجلس الوزراء تعديلات جوهرية على نظامي التقاعد المدني والتأمينات الاجتماعية، تضمّنت رفع سن التقاعد النظامي تدريجياً ورفع الحد الأدنى لمدة الخدمة اللازمة للتقاعد المبكر.{' '}
+                  <strong style={{color:'#1F2937'}}>أُعفي من هذه التعديلات</strong> كل من كان عمره الهجري{' '}
+                  <strong style={{color:gold2}}>50 سنة فأكثر</strong>{' '}أو مدة خدمته{' '}
+                  <strong style={{color:gold2}}>240 شهراً فأكثر</strong>{' '}
+                  في <strong style={{color:'#1F2937'}}>03/07/2024م</strong>، ويسري عليهم النظام القديم كما كان.
+                </div>
+              </div>
+              {/* رابط التفاصيل */}
+              <div style={{background:bg,padding:'7px 14px',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
+                <span style={{fontSize:9,color:txt2}}>لمزيد من التفاصيل حول التعديلات:</span>
+                <a href="https://awareness.gosi.gov.sa/" target="_blank" rel="noopener noreferrer" style={{color:blu,fontWeight:800,textDecoration:'none',fontSize:9,display:'inline-flex',alignItems:'center',gap:3,borderBottom:`1px solid ${blu}50`}}>زيارة الرابط ↗</a>
+              </div>
+            </div>
+          </>}
+          {/* تاريخ التقاعد */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10,marginBottom:8}}>
+            <div>
+              <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>📅 تاريخ التقاعد (م)</div>
+              <input type="date" value={info.rd} onChange={e=>handleRdChange(e.target.value)} style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
+              {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{fmtHijri(info.rd)}</div>}
+            </div>
+            <div>
+              <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 تاريخ التقاعد (هـ)</div>
+              <input type="text" value={rdH||isoToHijriStr(info.rd)} onChange={e=>handleRdHijriChange(e.target.value)} placeholder="1446/07/01" style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
+              {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(info.rd).toLocaleDateString('ar-SA')}</div>}
+            </div>
+          </div>
+
+          {/* العمر عند التقاعد */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+            <div>
+              <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🎂 العمر عند التقاعد (م)</div>
+              <input type="number" inputMode="decimal" min="40" max="70" step="0.5" value={retAge} onChange={e=>handleAgeChange(e.target.value)} placeholder={ri.rY?`${ri.rY+ri.rM/12}`:'60'} style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
+            </div>
+            <div>
+              <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 العمر عند التقاعد (هـ)</div>
+              <input type="number" inputMode="decimal" min="40" max="72" step="0.5" value={retAgeH} onChange={e=>handleAgeHChange(e.target.value)} placeholder="55.5" style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
+              {hijriRetAge&&<div style={{fontSize:8,color:gold,marginTop:2,textAlign:'center'}}>{hijriRetAge.yrs} سنة{hijriRetAge.mths>0?` و ${hijriRetAge.mths} شهر`:''}</div>}
+            </div>
+          </div>
+
           {info.bd&&(()=>{
             const aH=ri.aR;
             const myRA=RA.find(r=>aH>=(r.mn||0)&&(!r.mx||aH<r.mx))||RA[RA.length-1];
@@ -399,23 +494,6 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
             const earlyLeft=Math.max(0,ri.eR-psAtRF.tM);
             return(
             <div style={{marginTop:8}}>
-
-              {/* العمر + التصنيف */}
-              <div style={{textAlign:'center',marginBottom:8}}>
-                <div style={{fontSize:22,fontWeight:900,color:gold2,lineHeight:1}}>{age(info.bd).g} <span style={{fontSize:13,fontWeight:500,color:txt2}}>م</span> / {age(info.bd).h} <span style={{fontSize:13,fontWeight:500,color:txt2}}>هـ</span></div>
-              </div>
-              <div style={{background:ri.ex?grnL:goldL,border:`1px solid ${ri.ex?grn:org}25`,borderRadius:10,padding:'8px 12px',marginBottom:10,display:'flex',gap:7,alignItems:'flex-start'}}>
-                <span style={{fontSize:14,flexShrink:0}}>{ri.ex?'✅':'📋'}</span>
-                <div>
-                  <div style={{fontSize:11,fontWeight:800,color:ri.ex?grn:gold2}}>{ri.ex?'غير مشمول بتعديلات 2024':'مشمول بتعديلات 2024'}</div>
-                  <div style={{fontSize:9,color:txt2,marginTop:2,lineHeight:1.6}}>
-                    {ri.ex
-                      ?'عمرك تجاوز 48.5 سنة هجرية أو خدمتك 240 شهر+ في 3/7/2024 — يسري عليك النظام القديم.'
-                      :`عمرك في 3/7/2024: ${ri.aRH.yrs} سنة${ri.aRH.mths>0?` و ${ri.aRH.mths} شهر`:''} هجري`
-                    }
-                  </div>
-                </div>
-              </div>
 
               {/* القسمان: المبكر | النظامي */}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -430,7 +508,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                     <div style={{fontSize:17,fontWeight:900,color:earlyDone?grn:red,lineHeight:1}}>{ri.eR} شهر</div>
                     <div style={{fontSize:8,color:txt2,marginTop:2}}>{ri.eY} سنة</div>
                     {psAtRF.tM>0&&<div style={{marginTop:5,fontSize:8,color:earlyDone?grn:txt2,fontWeight:600}}>
-                      {earlyDone?`✓ مؤهل — ${psAtRF.tM} شهر`:`متبقٍ ${earlyLeft} شهر`}
+                      {earlyDone?`✓ مؤهل — ${fMD(psAtRF.tM)}`:`متبقٍ ${fMD(earlyLeft)}`}
                     </div>}
                   </div>
                   {!ri.ex&&(
@@ -496,32 +574,6 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           })()}
         </div>
 
-        {/* تاريخ التقاعد */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-          <div>
-            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>📅 تاريخ التقاعد (م)</div>
-            <input type="date" value={info.rd} onChange={e=>handleRdChange(e.target.value)} style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
-            {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{fmtHijri(info.rd)}</div>}
-          </div>
-          <div>
-            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 تاريخ التقاعد (هـ)</div>
-            <input type="text" value={rdH||isoToHijriStr(info.rd)} onChange={e=>handleRdHijriChange(e.target.value)} placeholder="1446/07/01" style={{...inp,border:`2px solid ${gold}60`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
-            {info.rd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(info.rd).toLocaleDateString('ar-SA')}</div>}
-          </div>
-        </div>
-
-        {/* العمر عند التقاعد */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-          <div>
-            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🎂 العمر عند التقاعد (م)</div>
-            <input type="number" inputMode="decimal" min="40" max="70" step="0.5" value={retAge} onChange={e=>handleAgeChange(e.target.value)} placeholder={ri.rY?`${ri.rY+ri.rM/12}`:'60'} style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
-          </div>
-          <div>
-            <div style={{fontSize:12,color:gold,marginBottom:4,fontWeight:700}}>🌙 العمر عند التقاعد (هـ)</div>
-            <input type="number" inputMode="decimal" min="40" max="72" step="0.5" value={retAgeH} onChange={e=>handleAgeHChange(e.target.value)} placeholder="55.5" style={{...inp,border:`2px solid ${gold}50`,color:gold2,fontWeight:700,direction:'ltr',textAlign:'center'}}/>
-            {hijriRetAge&&<div style={{fontSize:8,color:gold,marginTop:2,textAlign:'center'}}>{hijriRetAge.yrs} سنة{hijriRetAge.mths>0?` و ${hijriRetAge.mths} شهر`:''}</div>}
-          </div>
-        </div>
       </div>
 
       {/* المعالون */}
@@ -544,32 +596,33 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         <button onClick={addP} style={{padding:'7px 14px',borderRadius:10,border:`1.5px solid ${gold}`,background:'transparent',color:gold,fontWeight:700,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>+ إضافة</button>
       </div>
 
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:4}}>
       {periods.map((p,i)=>{
         const e=p.ac?aEnd:p.ed;const c=mdfCal(p.sd,e,p.cal||'g');
-        const sc=p.sy.includes('اختياري')?pur:p.sy.includes('مدني')||p.sy.includes('عسكري')?blu:gold;
+        const sc=p.sy==='تقاعد عسكري'?pur:p.sy==='تقاعد مدني'?blu:p.sy==='اشتراك اختياري'?gold:org;
+        const sbg=p.sy==='تقاعد عسكري'?purL:p.sy==='تقاعد مدني'?bluL:p.sy==='اشتراك اختياري'?goldL:orgL;
         return(
-          <div key={p.id} style={{background:card,borderRadius:14,padding:14,marginBottom:10,border:`1px solid ${brd}`,borderRight:`3px solid ${sc}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <div style={{width:26,height:26,borderRadius:8,background:`${sc}20`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:sc,border:`1px solid ${sc}30`,flexShrink:0}}>{i+1}</div>
-                <span style={{fontSize:12,fontWeight:700,color:txt}}>مدة {i+1}</span>
+          <div key={p.id} style={{background:sbg,borderRadius:12,padding:10,border:`1.5px solid ${sc}30`,borderRight:`4px solid ${sc}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{width:22,height:22,borderRadius:7,background:`${sc}20`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:sc,border:`1px solid ${sc}30`,flexShrink:0}}>{i+1}</div>
+                <span style={{fontSize:11,fontWeight:700,color:txt}}>مدة {i+1}</span>
               </div>
-              <button onClick={()=>setPeriods(x=>x.filter(q=>q.id!==p.id))} style={{padding:'4px 10px',borderRadius:8,border:'none',background:redL,color:red,fontSize:10,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>حذف</button>
+              <button onClick={()=>setPeriods(x=>x.filter(q=>q.id!==p.id))} style={{padding:'3px 8px',borderRadius:7,border:'none',background:redL,color:red,fontSize:9,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>حذف</button>
             </div>
 
-            <input value={p.emp} onChange={e=>upP(p.id,'emp',e.target.value)} placeholder="اسم جهة العمل (مثال: وزارة المالية / شركة أرامكو)" style={{...inp,marginBottom:4,textAlign:'right'}}/>
-            <div style={{fontSize:9,color:txt2,marginBottom:8}}>سيظهر في التقرير النهائي كمرجع</div>
+            <input value={p.emp} onChange={e=>upP(p.id,'emp',e.target.value)} placeholder="جهة العمل" style={{...inp,marginBottom:6,textAlign:'right',padding:'7px 10px',fontSize:12}}/>
 
-            <div style={{display:'flex',gap:6,marginBottom:8,alignItems:'center'}}>
-              <span style={{fontSize:11,color:txt2,fontWeight:600}}>التقويم:</span>
-              {[{v:'g',lb:'م ميلادي'},{v:'h',lb:'هـ هجري'}].map(o=>(
-                <button key={o.v} onClick={()=>toggleCal(p.id,o.v)} style={{padding:'4px 10px',borderRadius:8,border:`1.5px solid ${(p.cal||'g')===o.v?sc:brd}`,background:(p.cal||'g')===o.v?sc:'transparent',color:(p.cal||'g')===o.v?'#fff':txt2,fontSize:10,cursor:'pointer',fontWeight:700,fontFamily:'inherit'}}>{o.lb}</button>
+            <div style={{display:'flex',gap:5,marginBottom:6,alignItems:'center'}}>
+              <span style={{fontSize:10,color:txt2,fontWeight:600}}>التقويم:</span>
+              {[{v:'g',lb:'م'},{v:'h',lb:'هـ'}].map(o=>(
+                <button key={o.v} onClick={()=>toggleCal(p.id,o.v)} style={{padding:'3px 9px',borderRadius:7,border:`1.5px solid ${(p.cal||'g')===o.v?sc:brd}`,background:(p.cal||'g')===o.v?sc:'transparent',color:(p.cal||'g')===o.v?'#fff':txt2,fontSize:10,cursor:'pointer',fontWeight:700,fontFamily:'inherit'}}>{o.lb}</button>
               ))}
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
               <div>
-                <div style={{fontSize:11,color:txt2,marginBottom:4}}>تاريخ البداية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
+                <div style={{fontSize:10,color:txt2,marginBottom:3}}>من {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
                 {(p.cal||'g')==='h'
                   ?<><input type="text" value={p.sdH!==undefined?p.sdH:isoToHijriStr(p.sd)} onChange={e=>handleHijriDate(p.id,'sd',e.target.value)} placeholder="1446/07/01" style={{...inp,direction:'ltr',textAlign:'center'}}/>
                     {p.sd&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(p.sd).toLocaleDateString('ar-SA')}</div>}</>
@@ -578,9 +631,9 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                 }
               </div>
               <div>
-                <div style={{fontSize:11,color:txt2,marginBottom:4}}>تاريخ النهاية {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
+                <div style={{fontSize:10,color:txt2,marginBottom:3}}>إلى {(p.cal||'g')==='h'?'(هجري)':'(ميلادي)'}</div>
                 {p.ac
-                  ?<div style={{padding:'10px 8px',borderRadius:10,background:grnL,color:grn,fontSize:10,fontWeight:600,textAlign:'center',border:`1px solid ${grn}30`}}>مستمر → {info.rd?new Date(info.rd).toLocaleDateString('ar-SA'):'التقاعد'}</div>
+                  ?<div style={{padding:'7px 6px',borderRadius:8,background:grnL,color:grn,fontSize:9,fontWeight:600,textAlign:'center',border:`1px solid ${grn}30`}}>مستمر → {info.rd?new Date(info.rd).toLocaleDateString('ar-SA'):'التقاعد'}</div>
                   :(p.cal||'g')==='h'
                     ?<><input type="text" value={p.edH!==undefined?p.edH:isoToHijriStr(p.ed)} onChange={e=>handleHijriDate(p.id,'ed',e.target.value)} placeholder="1446/07/01" style={{...inp,direction:'ltr',textAlign:'center'}}/>
                       {p.ed&&<div style={{fontSize:8,color:txt2,marginTop:2,textAlign:'center'}}>{new Date(p.ed).toLocaleDateString('ar-SA')}</div>}</>
@@ -590,185 +643,79 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
               </div>
             </div>
 
-            <label style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:grn,fontWeight:600,marginBottom:8,cursor:'pointer'}}>
-              <input type="checkbox" checked={p.ac} onChange={e=>upP(p.id,'ac',e.target.checked)} style={{accentColor:grn,width:15,height:15}}/>
-              على رأس العمل حتى تاريخ التقاعد
+            <label style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:grn,fontWeight:600,marginBottom:6,cursor:'pointer'}}>
+              <input type="checkbox" checked={p.ac} onChange={e=>upP(p.id,'ac',e.target.checked)} style={{accentColor:grn,width:13,height:13}}/>
+              على رأس العمل حتى التقاعد
             </label>
 
-            <div style={{display:'grid',gridTemplateColumns:`1fr 1fr${p.ac?'':' 1fr'}`,gap:6}}>
+            <div style={{display:'grid',gridTemplateColumns:`1fr 1fr${p.ac?'':' 1fr'}`,gap:5}}>
               <div>
-                <div style={{fontSize:11,color:txt2,marginBottom:4}}>الأجر الشهري (ر.س)</div>
-                <input type="number" value={p.sl||''} onChange={e=>upP(p.id,'sl',+e.target.value)} style={{...inp,direction:'ltr',textAlign:'center'}}/>
-                <div style={{fontSize:9,color:txt2,marginTop:3}}>الأجر الخاضع للتأمين (يُستخدم لحساب المعاش)</div>
+                <div style={{fontSize:10,color:txt2,marginBottom:3}}>الأجر (ر.س)</div>
+                <input type="number" value={p.sl||''} onChange={e=>upP(p.id,'sl',+e.target.value)} style={{...inp,direction:'ltr',textAlign:'center',padding:'7px 8px',fontSize:12}}/>
               </div>
               <div>
-                <div style={{fontSize:11,color:txt2,marginBottom:4}}>النظام</div>
-                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:10,appearance:'none',WebkitAppearance:'none'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
-                <div style={{fontSize:9,color:txt2,marginTop:3}}>{p.sy.includes('مدني')||p.sy.includes('عسكري')?'التقاعد المدني: وزارات + جهات حكومية':p.sy.includes('اختياري')?'الاشتراك الاختياري: للمستقلين والعاطلين':p.sy.includes('حكومي')?'تأمينات حكومي: شركات حكومية كأرامكو':'تأمينات خاص: القطاع الخاص'}</div>
+                <div style={{fontSize:10,color:txt2,marginBottom:3}}>النظام</div>
+                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:9,appearance:'none',WebkitAppearance:'none',padding:'7px 8px'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
               </div>
               {!p.ac&&<div>
-                <div style={{fontSize:11,color:txt2,marginBottom:4}}>الحالة</div>
-                <select value={p.st} onChange={e=>upP(p.id,'st',e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none'}}><option>نشط</option><option>منتهي</option><option>مستبعد</option></select>
+                <div style={{fontSize:10,color:txt2,marginBottom:3}}>الحالة</div>
+                <select value={p.st} onChange={e=>upP(p.id,'st',e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none',padding:'7px 8px',fontSize:9}}><option>نشط</option><option>منتهي</option><option>مستبعد</option></select>
               </div>}
             </div>
 
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,background:bg2,borderRadius:10,padding:'8px 6px',marginTop:8,textAlign:'center',border:`1px solid ${brd2}`}}>
-              <div><div style={{fontSize:8,color:txt2,marginBottom:2}}>أشهر {(p.cal||'g')==='h'?'هجرية':'ميلادية'}</div><div style={{fontSize:20,fontWeight:800,color:gold2}}>{c.m}</div></div>
-              <div><div style={{fontSize:8,color:txt2,marginBottom:2}}>أيام</div><div style={{fontSize:20,fontWeight:800,color:gold2}}>{c.d}</div></div>
-              <div><div style={{fontSize:8,color:txt2,marginBottom:2}}>النظام</div><div style={{fontSize:9,fontWeight:700,color:new Date(p.sd)<new Date('2001-04-25')?org:blu}}>{new Date(p.sd)<new Date('2001-04-25')?'قديم ÷600':'جديد ÷480'}</div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,background:bg2,borderRadius:8,padding:'5px 4px',marginTop:6,textAlign:'center',border:`1px solid ${brd2}`}}>
+              <div><div style={{fontSize:7,color:txt2,marginBottom:1}}>أشهر</div><div style={{fontSize:15,fontWeight:800,color:gold2}}>{c.m}</div></div>
+              <div><div style={{fontSize:7,color:txt2,marginBottom:1}}>أيام</div><div style={{fontSize:15,fontWeight:800,color:gold2}}>{c.d}</div></div>
+              <div><div style={{fontSize:7,color:txt2,marginBottom:1}}>النظام</div><div style={{fontSize:8,fontWeight:700,color:new Date(p.sd)<new Date('2001-04-25')?org:blu}}>{new Date(p.sd)<new Date('2001-04-25')?'÷600':'÷480'}</div></div>
             </div>
           </div>
         );
       })}
-
-
-      {/* أجور آخر 24 شهر */}
-      <div style={{display:'flex',alignItems:'center',gap:10,margin:'16px 0 10px'}}>
-        <div style={{flex:1,height:1,background:brd}}/><div style={{fontSize:11,color:txt2,whiteSpace:'nowrap'}}>أجور آخر 24 شهر</div><div style={{flex:1,height:1,background:brd}}/>
-      </div>
-      <div style={crd}>
-        <SH icon="💰" label={`أجور آخر 24 شهر — حتى ${info.rd?new Date(info.rd).toLocaleDateString('ar-SA'):'تاريخ التقاعد'}`} color={gold}/>
-        <div style={{background:bluL,borderRadius:10,padding:'8px 12px',marginBottom:10,fontSize:10,color:blu,lineHeight:1.7,border:`1px solid ${blu}20`}}>
-          💡 <strong>لماذا مهمة؟</strong> متوسط أجور آخر 24 شهر هو الأساس في حساب معاشك. أدخلها بدقة للحصول على نتيجة صحيحة. يمكنك تعبئتها تلقائياً بآخر أجر مدخل في المدد.
-        </div>
-        <button onClick={()=>setSals(s24.map(()=>ps.lS||0))} style={{padding:'7px 12px',borderRadius:10,border:`1px solid ${pur}`,background:purL,color:pur,fontWeight:700,fontSize:10,cursor:'pointer',fontFamily:'inherit',marginBottom:8}}>تعبئة بآخر أجر — {fI(ps.lS)} ر.س</button>
-        <div style={{borderRadius:12,border:`1px solid ${brd}`,overflow:'hidden',maxHeight:340,overflowY:'auto'}}>
-          {s24.map((l,i)=>(
-            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr auto auto',padding:'3px 8px',borderBottom:`1px solid ${brd}`,background:i%2===0?bg2:card,alignItems:'center',gap:4}}>
-              <div style={{fontSize:10,fontWeight:600,color:gold2}}>{l}</div>
-              <input type="number" value={sals[i]||''} placeholder="0" onChange={e=>{const c=[...sals];c[i]=+e.target.value;setSals(c)}} style={{...inp,width:80,direction:'ltr',textAlign:'center',padding:'4px 6px',fontSize:12}}/>
-              {sals[i]>0&&<button onClick={()=>setSals(prev=>prev.map((s,j)=>j>i?sals[i]:s))} style={{padding:'3px 7px',borderRadius:7,border:`1px solid ${brd}`,background:bg,color:txt2,fontSize:9,cursor:'pointer',fontFamily:'inherit'}}>↓</button>}
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* متوسط الأجور */}
-      <div style={{background:`linear-gradient(135deg,${gold} 0%,#10B981 100%)`,borderRadius:20,padding:'20px 16px',textAlign:'center',marginBottom:12,boxShadow:`0 8px 30px ${gold}30`}}>
-        <div style={{fontSize:10,color:'rgba(255,255,255,0.75)',letterSpacing:2,marginBottom:4,fontWeight:500}}>متوسط آخر 24 شهر</div>
-        <div style={{fontSize:40,fontWeight:900,color:'#FFFFFF',lineHeight:1}}>{fmt(avg)}</div>
-        <div style={{fontSize:11,color:'rgba(255,255,255,0.6)',marginTop:4}}>ريال سعودي</div>
-      </div>
-
-      {/* قاعدة 150% */}
-      {s60>0&&(
-        <div style={crd}>
-          <SH icon="📐" label="قاعدة 150% — المادة 38" color={blu}/>
-          <div style={{fontSize:11,lineHeight:2}}>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:`1px solid ${brd2}`}}><span style={{color:txt2}}>أجر الشهر الستين</span><strong style={{color:blu}}>{fI(s60)} ر.س</strong></div>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{color:txt2}}>الحد الأقصى 150%</span><strong>{fI(s60*1.5)} ر.س</strong></div>
-            {r150.on&&<div style={{background:r150.ov?redL:grnL,borderRadius:10,padding:'8px 10px',marginTop:6,fontWeight:700,color:r150.ov?red:grn,fontSize:11,border:`1px solid ${r150.ov?red:grn}30`}}>{r150.ov?`تجاوز → المعتمد: ${fI(r150.l)} ر.س`:`ضمن الحد → المعتمد: ${fmt(r150.app)} ر.س`}</div>}
-          </div>
-        </div>
-      )}
-
-      <button onClick={()=>setTab('status')} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:4,boxShadow:`0 8px 32px ${gold}40`,letterSpacing:0.3}}>اعرف وضعك التأميني الحالي ←</button>
-    </div>)}
-
-    {/* ════ تبويب الوضع التقاعدي ════ */}
-    {tab==='status'&&(()=>{
-      const today=new Date();
-      const todayISO=today.toISOString().split('T')[0];
-      const monthsToStat=ri.dt?Math.max(0,Math.round((ri.dt-today)/864e5/30.44)):null;
-      const earlyNeed=Math.max(0,ri.eR-ps.tM);
-      const earlyNeedAtRF=Math.max(0,ri.eR-psAtRF.tM);
-      // تاريخ التقاعد المبكر المتوقع (من اليوم)
-      let earlyDate=null;
-      if(earlyNeed===0){earlyDate=todayISO;}
-      else if(info.bd){
-        const future=new Date(today.getFullYear(),today.getMonth()+earlyNeed,today.getDate());
-        earlyDate=future.toISOString().split('T')[0];
-      }
-      return(<div>
-
-      {/* عنوان الصفحة + شرح القرار */}
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:16,fontWeight:900,color:txt,marginBottom:8,letterSpacing:-0.3}}>الوضع التأميني الحالي</div>
-        <div style={{background:'#F8FAFC',borderRadius:14,padding:'12px 14px',border:'1px solid #E2E8F0',position:'relative',overflow:'hidden'}}>
-          <div style={{position:'absolute',top:0,right:0,width:60,height:60,background:`radial-gradient(circle,${gold}15,transparent 70%)`,pointerEvents:'none'}}/>
-          <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
-            <span style={{fontSize:14,flexShrink:0,marginTop:1}}>📜</span>
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:'#374151',marginBottom:5}}>
-                تعديلات نظام التقاعد — قرار مجلس الوزراء 3 يوليو 2024م
-              </div>
-              <div style={{fontSize:9,color:'#6B7280',lineHeight:1.9}}>
-                أقرّ مجلس الوزراء تعديلات جوهرية على نظامي التقاعد المدني والتأمينات الاجتماعية، تضمّنت رفع سن التقاعد النظامي تدريجياً ورفع الحد الأدنى لمدة الخدمة اللازمة للتقاعد المبكر.
-                <br/>
-                <strong style={{color:'#374151'}}>أُعفي من هذه التعديلات</strong> كل من كان عمره الهجري{' '}
-                <strong style={{color:gold2}}>50 سنة فأكثر</strong>{' '}أو مدة خدمته{' '}
-                <strong style={{color:gold2}}>240 شهراً (20 سنة) فأكثر</strong>{' '}
-                في تاريخ تطبيق القرار <strong style={{color:'#374151'}}>03/07/2024م</strong>، ويسري عليهم النظام القديم كما كان.
-                <br/>
-                يوضّح هذا القسم موقعك بالنسبة لهذه التعديلات وأثرها على سن تقاعدك ومدة الخدمة المطلوبة.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* بطاقة التصنيف */}
-      <div style={crd}>
-        <SH icon="📋" label="التصنيف — قرار 3 يوليو 2024م" color={gold}/>
-        {!info.bd?(
-          <Note icon="ℹ️" text="أدخل تاريخ الميلاد في تبويب (البيانات) لعرض تصنيفك التقاعدي." color={blu} bgc={bluL}/>
-        ):(
-          <>
-          {ri.ex?(
-            <Note icon="✅" text="عمرك في 3/7/2024 تجاوز 48.5 سنة هجرية أو خدمتك بلغت 240 شهراً — غير مشمول بالتعديلات. يطبق عليك النظام القديم (60 سنة، 300 شهر)." color={grn} bgc={grnL}/>
-          ):(
-            <>
-            {/* الشبكة الرئيسية */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-              {[
-                {lb:'العمر الهجري في 3/7/2024',val:ri.aRH.yrs>0||ri.aRH.mths>0?`${ri.aRH.yrs} سنة${ri.aRH.mths>0?` و ${ri.aRH.mths} شهر`:''} هجري`:`${ri.aR} سنة هجرية`,clr:blu},
-                {lb:'أشهر الخدمة في 3/7/2024',val:`${psAtRF.tM} شهر (${(psAtRF.tM/12).toFixed(1)} سنة)`,clr:gold},
-                {lb:'سن التقاعد النظامي',val:ri.lb,clr:gold2},
-                {lb:'تاريخ التقاعد النظامي',val:ri.dt?(fmtHijri(ri.dt.toISOString().split('T')[0])||ri.dt.toLocaleDateString('ar-SA')):'-',clr:txt},
-              ].map((x,i)=>(
-                <div key={i} style={{background:bg2,borderRadius:12,padding:'10px 12px',border:`1px solid ${brd}`}}>
-                  <div style={{fontSize:9,color:txt2,marginBottom:4}}>{x.lb}</div>
-                  <div style={{fontSize:12,fontWeight:700,color:x.clr}}>{x.val}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* شريط التقدم للتقاعد النظامي */}
+      {/* ── وضع التقاعد المبكر والنظامي — تحت المدد مباشرة ── */}
+      {info.bd&&(()=>{
+        const today=new Date();
+        const todayISO=today.toISOString().split('T')[0];
+        const monthsToStat=ri.dt?Math.max(0,Math.round((ri.dt-today)/864e5/30.44)):null;
+        const earlyNeed=Math.max(0,ri.eR-ps.tM);
+        const earlyNeedAtRF=Math.max(0,ri.eR-psAtRF.tM);
+        let earlyDate=null;
+        if(earlyNeed===0){earlyDate=todayISO;}
+        else if(info.bd){const future=new Date(today.getFullYear(),today.getMonth()+earlyNeed,today.getDate());earlyDate=future.toISOString().split('T')[0];}
+        return(
+          <div style={{...crd,padding:'12px 14px',marginBottom:10}}>
+            {/* شريط التقاعد النظامي */}
             {monthsToStat!==null&&(
-              <div style={{background:bg2,borderRadius:12,padding:'10px 12px',marginBottom:10,border:`1px solid ${brd}`}}>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:6}}>
-                  <span style={{color:txt2}}>متبقٍ للتقاعد النظامي</span>
-                  <strong style={{color:monthsToStat===0?grn:gold2}}>{monthsToStat===0?'✓ بلغت السن النظامية':`${fI(monthsToStat)} شهر`}</strong>
-                </div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10,marginBottom:10,background:bg2,borderRadius:10,padding:'8px 12px',border:`1px solid ${brd}`}}>
+                <span style={{color:txt2,fontWeight:600}}>متبقٍ للتقاعد النظامي</span>
+                <strong style={{color:monthsToStat===0?grn:gold2,fontSize:11}}>{monthsToStat===0?'✓ بلغت السن النظامية':`${fI(monthsToStat)} شهر`}</strong>
               </div>
             )}
-
-            {/* التقاعد المبكر */}
-            <div style={{background:earlyNeedAtRF===0?grnL:redL,borderRadius:12,padding:'12px 14px',marginBottom:10,border:`1px solid ${earlyNeedAtRF===0?grn:red}30`}}>
+            {/* شريط التقاعد المبكر */}
+            <div style={{background:earlyNeedAtRF===0?grnL:redL,borderRadius:12,padding:'12px 14px',marginBottom:10,border:`1.5px solid ${earlyNeedAtRF===0?grn:red}30`}}>
               {earlyNeedAtRF===0?(
-                <div style={{fontSize:12,fontWeight:700,color:grn,textAlign:'center'}}>✓ مؤهل للتقاعد المبكر — {psAtRF.tM} شهر من أصل {ri.eR}</div>
+                <div style={{fontSize:12,fontWeight:700,color:grn,textAlign:'center'}}>✓ مؤهل للتقاعد المبكر — {fMD(psAtRF.tM)} من أصل {ri.eR}</div>
               ):(
                 <>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
                   <span style={{fontSize:11,fontWeight:700,color:red}}>المطلوب للتقاعد المبكر: {ri.eR} شهر</span>
-                  <span style={{fontSize:11,color:gold}}>متبقٍ: <strong>{earlyNeedAtRF} شهر</strong></span>
+                  <span style={{fontSize:11,color:gold}}>متبقٍ: <strong>{fMD(earlyNeedAtRF)}</strong></span>
                 </div>
-                <div style={{height:6,borderRadius:6,background:`${red}20`,overflow:'hidden'}}>
-                  <div style={{height:'100%',borderRadius:6,background:gold,width:`${Math.min(100,(psAtRF.tM/ri.eR)*100).toFixed(1)}%`}}/>
+                <div style={{height:7,borderRadius:7,background:`${red}20`,overflow:'hidden',marginBottom:6}}>
+                  <div style={{height:'100%',borderRadius:7,background:`linear-gradient(90deg,${grn},${gold})`,width:`${Math.min(100,(psAtRF.tM/ri.eR)*100).toFixed(1)}%`,transition:'width 0.4s'}}/>
                 </div>
-                <div style={{fontSize:9,color:txt2,marginTop:4,textAlign:'center'}}>خدمة في 3/7/2024: {psAtRF.tM} / {ri.eR} شهر</div>
+                <div style={{fontSize:9,color:txt2,textAlign:'center'}}>خدمة في 3/7/2024: {fMD(psAtRF.tM)} / {ri.eR} شهر</div>
                 </>
               )}
             </div>
-
-            {/* الخلاصة: المدة المطلوبة + أقرب تاريخ مبكر */}
+            {/* بطاقتا المدة وأقرب تاريخ */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
               <div style={{background:bg2,borderRadius:12,padding:'10px 12px',border:`1px solid ${brd}`,textAlign:'center'}}>
                 <div style={{fontSize:9,color:txt2,marginBottom:4}}>المدة المطلوبة للمبكر (الآن)</div>
                 {earlyNeed===0
                   ?<div style={{fontSize:13,fontWeight:700,color:grn}}>✓ مؤهل الآن</div>
-                  :<><div style={{fontSize:20,fontWeight:800,color:red}}>{fI(earlyNeed)}</div><div style={{fontSize:9,color:txt2}}>شهر إضافي</div></>
-                }
+                  :<div style={{fontSize:11,fontWeight:800,color:red}}>{fMD(earlyNeed)}</div>}
               </div>
               <div style={{background:bg2,borderRadius:12,padding:'10px 12px',border:`1px solid ${brd}`,textAlign:'center'}}>
                 <div style={{fontSize:9,color:txt2,marginBottom:4}}>أقرب تاريخ للمبكر</div>
@@ -778,24 +725,163 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                 ):<div style={{fontSize:11,color:txt2}}>—</div>}
               </div>
             </div>
-            </>
-          )}
-          </>
-        )}
-      </div>
-
-
-      <div style={{background:bg2,borderRadius:12,padding:'8px 12px',fontSize:8,color:txt2,lineHeight:2,border:`1px solid ${brd}`,marginBottom:12}}>
-        <strong style={{color:gold}}>المرجع: </strong>قرار مجلس الوزراء — تعديلات نظامي التقاعد المدني والتأمينات الاجتماعية — 3 يوليو 2024م
-      </div>
+          </div>
+        );
+      })()}
 
       <button onClick={()=>setTab('result')} style={{width:'100%',padding:'15px',borderRadius:16,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',marginTop:4,boxShadow:`0 8px 32px ${gold}40`,letterSpacing:0.3}}>احسب معاشي التقاعدي ←</button>
-
-      </div>);
-    })()}
+    </div>)}
 
     {/* ════ تبويب النتائج ════ */}
     {tab==='result'&&(<div>
+
+      {/* ── Retirement Readiness Dashboard ── */}
+      {(info.bd||periods.length>0)&&(
+      <div style={{background:'linear-gradient(160deg,#022C22 0%,#065F46 55%,#059669 100%)',borderRadius:24,padding:'20px 16px 18px',marginBottom:14,position:'relative',overflow:'hidden',boxShadow:'0 8px 32px rgba(5,150,105,0.25)'}}>
+        <div style={{position:'absolute',top:-60,right:-40,width:200,height:200,background:'radial-gradient(circle,rgba(255,255,255,0.08),transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:-20,left:-20,width:140,height:140,background:'radial-gradient(circle,rgba(255,255,255,0.05),transparent 70%)',pointerEvents:'none'}}/>
+        {/* Title */}
+        <div style={{textAlign:'center',marginBottom:14,position:'relative'}}>
+          <div style={{fontSize:8,color:'rgba(255,255,255,0.55)',letterSpacing:2.5,marginBottom:10,textTransform:'uppercase',fontWeight:500}}>Retirement Readiness Score</div>
+          {/* SVG Gauge */}
+          {(()=>{
+            const R=58,cx=75,cy=72,S=150;
+            const startA=Math.PI*0.72,endA=Math.PI*2.28;
+            const range=endA-startA;
+            const pct=readiness/100;
+            const fillA=startA+range*pct;
+            const arcPath=(a1,a2,r,sweep=1)=>{
+              const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+              const x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+              const la=(a2-a1)%(Math.PI*2)>Math.PI?1:0;
+              return`M${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${la} ${sweep} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+            };
+            const clr=readiness>=70?'#34D399':readiness>=40?'#FCD34D':'#F87171';
+            const segments=[
+              {from:startA,to:startA+range*0.4,clr:'#EF4444'},
+              {from:startA+range*0.4,to:startA+range*0.7,clr:'#F59E0B'},
+              {from:startA+range*0.7,to:endA,clr:'#10B981'},
+            ];
+            return(
+              <div style={{display:'flex',justifyContent:'center'}}>
+              <svg viewBox={`0 0 ${S} ${S}`} style={{width:130,height:115,display:'block',overflow:'visible'}}>
+                {/* Track segments */}
+                {segments.map((s,i)=>(
+                  <path key={i} d={arcPath(s.from,s.to,R)} fill="none" stroke={s.clr} strokeWidth="11" strokeLinecap="butt" opacity="0.22"/>
+                ))}
+                {/* Fill arc */}
+                {readiness>0&&<path d={arcPath(startA,fillA,R)} fill="none" stroke={clr} strokeWidth="11" strokeLinecap="round"/>}
+                {/* Center score */}
+                <text x={cx} y={cy-12} textAnchor="middle" fontSize="34" fontWeight="900" fill="#fff" fontFamily="Tajawal,sans-serif">{readiness}</text>
+                <text x={cx} y={cy+8} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.55)" fontFamily="Tajawal,sans-serif">من 100</text>
+                <text x={cx} y={cy+26} textAnchor="middle" fontSize="10" fill={clr} fontWeight="800" fontFamily="Tajawal,sans-serif">
+                  {readiness>=70?'ممتاز ✓':readiness>=50?'جيد':readiness>=30?'متوسط':'يحتاج تحسين'}
+                </text>
+                {/* Tick labels */}
+                {[{a:startA,lb:'0'},{a:startA+range*0.5,lb:'50'},{a:endA,lb:'100'}].map((t,i)=>(
+                  <text key={i} x={(cx+(R+18)*Math.cos(t.a)).toFixed(1)} y={(cy+(R+18)*Math.sin(t.a)+4).toFixed(1)} textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.35)" fontFamily="Tajawal,sans-serif">{t.lb}</text>
+                ))}
+              </svg>
+              </div>
+            );
+          })()}
+        </div>
+        {/* 3 Stats */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,position:'relative'}}>
+          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
+            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Monthly Pension</div>
+            <div style={{fontSize:pen.f?14:12,fontWeight:900,color:'#fff',lineHeight:1}}>{pen.f?fmt(pen.f):'—'}</div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>ر.س / شهر</div>
+          </div>
+          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
+            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Time to Retire</div>
+            <div style={{fontSize:14,fontWeight:900,color:'#fff',lineHeight:1}}>
+              {countdown?`${countdown.y}س ${countdown.r}ش`:'—'}
+            </div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>{countdown?`${countdown.m} شهر`:'حدد تاريخ التقاعد'}</div>
+          </div>
+          <div style={{background:'rgba(255,255,255,0.1)',borderRadius:14,padding:'10px 6px',textAlign:'center',border:'1px solid rgba(255,255,255,0.15)'}}>
+            <div style={{fontSize:7.5,color:'rgba(255,255,255,0.55)',marginBottom:3,letterSpacing:0.5}}>Service Progress</div>
+            <div style={{fontSize:14,fontWeight:900,color:'#fff',lineHeight:1}}>{ps.tM?`${Math.floor(ps.tM/12)}س`:'—'}</div>
+            <div style={{fontSize:7,color:'rgba(255,255,255,0.45)',marginTop:2}}>{ps.tM?`${ps.tM} / ${ri.eR} شهر`:'أدخل مدد الخدمة'}</div>
+          </div>
+        </div>
+        {/* progress bar for service */}
+        {ps.tM>0&&ri.eR>0&&(
+          <div style={{marginTop:12,position:'relative'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+              <span style={{fontSize:8,color:'rgba(255,255,255,0.6)'}}>نسبة استيفاء التقاعد المبكر</span>
+              <span style={{fontSize:8,color:'rgba(255,255,255,0.8)',fontWeight:700}}>{Math.min(100,Math.round(psAtRF.tM/ri.eR*100))}%</span>
+            </div>
+            <div style={{height:6,borderRadius:6,background:'rgba(255,255,255,0.1)',overflow:'hidden'}}>
+              <div style={{height:'100%',borderRadius:6,background:`linear-gradient(90deg,${psAtRF.tM>=ri.eR?'#6EE7B7':'#FCD34D'},${psAtRF.tM>=ri.eR?'#34D399':'#F59E0B'})`,width:`${Math.min(100,psAtRF.tM/ri.eR*100).toFixed(1)}%`,transition:'width 0.6s ease'}}/>
+            </div>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* ── Pension Projection Chart ── */}
+      {projection.length>0&&(
+      <div style={{...crd,marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{width:32,height:32,borderRadius:10,background:`${gold}15`,border:`1px solid ${gold}35`,display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:16}}>📈</span>
+            <span style={{fontSize:13,fontWeight:800,color:gold2}}>Pension Projection</span>
+          </div>
+          <span style={{fontSize:9,color:txt2}}>ر.س / شهر</span>
+        </div>
+        {(()=>{
+          const maxP=Math.max(...projection.map(d=>d.pen));
+          const W=320,H=120,PT=26,PB=30;
+          const bW=32,gap=8,totalW=projection.length*(bW+gap)-gap;
+          const sx=(W-totalW)/2;
+          const ch=H-PT-PB;
+          const bh=v=>Math.max(6,(v/maxP)*ch);
+          const by=v=>PT+ch-bh(v);
+          return(
+            <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',maxWidth:360,margin:'0 auto'}}>
+              {/* grid lines */}
+              {[0.33,0.67,1].map((r,i)=>(
+                <line key={i} x1={sx} y1={PT+ch-r*ch} x2={sx+totalW} y2={PT+ch-r*ch} stroke={brd} strokeWidth="0.5" strokeDasharray="3,4"/>
+              ))}
+              {projection.map((d,i)=>{
+                const x=sx+i*(bW+gap);
+                const h=bh(d.pen),y=by(d.pen);
+                const clr=d.neg?'#94A3B8':d.cur?gold:'#10B981';
+                return(
+                  <g key={i}>
+                    {/* shadow */}
+                    <rect x={x+2} y={y+2} width={bW} height={h} rx={5} fill="rgba(0,0,0,0.05)"/>
+                    {/* bar */}
+                    <rect x={x} y={y} width={bW} height={h} rx={5} fill={clr} opacity={d.cur?1:0.72}/>
+                    {/* highlight */}
+                    {d.cur&&<rect x={x} y={y} width={bW} height={Math.min(h,12)} rx={5} fill="rgba(255,255,255,0.22)"/>}
+                    {/* value */}
+                    <text x={x+bW/2} y={y-5} textAnchor="middle" fontSize="8" fontWeight={d.cur?'800':'600'} fill={clr} fontFamily="Tajawal,sans-serif">
+                      {d.pen>=1000?`${(d.pen/1000).toFixed(1)}K`:d.pen}
+                    </text>
+                    {/* label */}
+                    <text x={x+bW/2} y={H-12} textAnchor="middle" fontSize="8" fill={d.cur?gold2:txt2} fontWeight={d.cur?'700':'400'} fontFamily="Tajawal,sans-serif">{d.lb}</text>
+                  </g>
+                );
+              })}
+              <line x1={sx} y1={PT+ch} x2={sx+totalW} y2={PT+ch} stroke={brd} strokeWidth="0.8"/>
+            </svg>
+          );
+        })()}
+        <div style={{display:'flex',gap:14,justifyContent:'center',marginTop:8,flexWrap:'wrap'}}>
+          {[{clr:'#94A3B8',lb:'تقاعد مبكر'},{clr:gold,lb:'الموعد المخطط'},{clr:'#10B981',lb:'تقاعد متأخر'}].map((t,i)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:5,fontSize:9,color:txt2}}>
+              <div style={{width:10,height:6,borderRadius:2,background:t.clr}}/>{t.lb}
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:10,padding:'8px 12px',borderRadius:10,background:bluL,border:`1px solid ${blu}20`,fontSize:9,color:'#1E40AF',lineHeight:1.7}}>
+          💡 كل سنة إضافية تزيد معاشك بحوالي <strong>{fmt(Math.round(Math.min(ps.lS,45000)/480*12))} ر.س</strong> سنوياً
+        </div>
+      </div>
+      )}
 
       {/* empty state */}
       {periods.length===0&&(
@@ -806,6 +892,213 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           <button onClick={()=>setTab('merged')} style={{padding:'13px 28px',borderRadius:14,border:'none',background:`linear-gradient(135deg,${gold},${grn})`,color:'#020A04',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit',boxShadow:`0 6px 24px ${gold}40`}}>← ابدأ بإدخال البيانات</button>
         </div>
       )}
+
+      {/* الوضع الحالي */}
+      {info.bd&&(
+        <div style={{background:'linear-gradient(135deg,rgba(42,74,56,0.4),rgba(26,56,42,0.3))',borderRadius:14,padding:'12px 14px',marginBottom:12,border:`1px solid ${brd}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontSize:12}}>📊</span><span style={{fontSize:12,fontWeight:700,color:gold2}}>وضعك الحالي</span>
+            {ri.ex&&<Tag color={grn} bg={grnL} sm>غير مشمول</Tag>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+            <div style={{background:card,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${brd}`}}>
+              <div style={{fontSize:8,color:txt2,marginBottom:1}}>المدة المتراكمة</div>
+              <div style={{fontSize:18,fontWeight:800,color:gold2}}>{fI(ps.tM)}</div>
+              <div style={{fontSize:8,color:txt2}}>شهر</div>
+            </div>
+            <div style={{background:card,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${brd}`}}>
+              <div style={{fontSize:8,color:txt2,marginBottom:1}}>السن النظامي</div>
+              <div style={{fontSize:11,fontWeight:800,color:gold2}}>{ri.lb}</div>
+              {ri.dt&&<div style={{fontSize:7,color:txt2}}>{ri.dt.toLocaleDateString('ar-SA')}</div>}
+            </div>
+            <div style={{background:ps.tM>=ri.eR?grnL:redL,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${ps.tM>=ri.eR?grn:red}30`}}>
+              <div style={{fontSize:8,color:txt2,marginBottom:1}}>التقاعد المبكر</div>
+              {ps.tM>=ri.eR
+                ?<div style={{fontSize:11,fontWeight:700,color:grn}}>✓ مؤهل</div>
+                :<div style={{fontSize:10,fontWeight:800,color:red}}>{fMD(Math.max(0,ri.eR-ps.tM))}</div>
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── عداد الأشهر الدائري ── */}
+      {(()=>{
+        const todayISO=new Date().toISOString().split('T')[0];
+        // أشهر حتى اليوم
+        let tD={oM:0,nM:0,vM:0,cM:0,wM:0};
+        periods.filter(p=>p.st!=='مستبعد'&&p.sd&&new Date(p.sd)<=new Date(todayISO)).forEach(p=>{
+          const raw=p.ac?todayISO:(p.ed||'');
+          const e=raw>todayISO?todayISO:raw;
+          if(!e)return;
+          const c=mdfCal(p.sd,e,p.cal||'g');const m=c.t;
+          if(p.sy==='تقاعد مدني')tD.cM+=m;else if(p.sy==='تقاعد عسكري')tD.wM+=m;
+          else if(p.sy==='اشتراك اختياري')tD.vM+=m;
+          else{new Date(p.sd)<new Date('2001-04-25')?tD.oM+=m:tD.nM+=m}
+        });
+        const todayTotal=tD.oM+tD.nM+tD.vM+tD.cM+tD.wM;
+        const fullTotal=ps.tM;
+        if(!fullTotal)return null;
+
+        // أنواع المدد
+        const types=[
+          {lb:'تأمينات قديم',actual:tD.oM,plan:ps.oM-tD.oM,clr:org,sub:'÷600'},
+          {lb:'تأمينات 1421',actual:tD.nM,plan:ps.nM-tD.nM,clr:blu,sub:'÷480'},
+          {lb:'مدني/عسكري',actual:tD.cM+tD.wM,plan:(ps.cM+ps.wM)-(tD.cM+tD.wM),clr:'#14B8A6',sub:'÷480'},
+          {lb:'اختياري',actual:tD.vM,plan:ps.vM-tD.vM,clr:pur,sub:'÷480'},
+        ].filter(t=>t.actual+t.plan>0);
+
+        // بناء القطاعات: ملون=فعلي، رمادي=مخطط
+        const allSegs=[];
+        types.forEach(t=>{
+          if(t.actual>0)allSegs.push({val:t.actual,clr:t.clr,real:true});
+          if(t.plan>0)allSegs.push({val:t.plan,clr:'#CBD5E1',real:false});
+        });
+
+        const S=210,OR=86,IR=58,cx=S/2,cy=S/2;
+        const GAP=allSegs.length>1?0.022:0;
+        const usable=2*Math.PI-allSegs.length*GAP;
+        let ang=-Math.PI/2;
+        const paths=allSegs.map(s=>{
+          const sw=s.val/fullTotal*usable;
+          const sa=ang+GAP/2,ea=sa+sw;ang=ea+GAP/2;
+          const la=sw>Math.PI?1:0;
+          const px=(v,r)=>(cx+r*Math.cos(v)).toFixed(2),py=(v,r)=>(cy+r*Math.sin(v)).toFixed(2);
+          return{...s,d:`M${px(sa,OR)} ${py(sa,OR)} A${OR} ${OR} 0 ${la} 1 ${px(ea,OR)} ${py(ea,OR)} L${px(ea,IR)} ${py(ea,IR)} A${IR} ${IR} 0 ${la} 0 ${px(sa,IR)} ${py(sa,IR)} Z`};
+        });
+
+        // احتساب المعاش حتى اليوم — نفس منطق المعاش الحالي
+        const lSd=ps.lS||0;
+        const cap150d=s60?Math.min(lSd,Math.min(s60*1.5,45000)):Math.min(lSd,45000);
+        let penToday=0;
+        if(tf.has&&tf.cEnd){
+          const cY_d=tf.cM/12,iM_d=tD.oM+tD.nM+tD.vM,iY_d=iM_d/12,tY_d=cY_d+iY_d;
+          if(tf.lastSys==='تقاعد'){
+            penToday=+(tf.cS*tY_d/40).toFixed(0);
+          } else {
+            const{dY:dYd,dM:dMd,dD:dDd}=hijriGap(tf.cEnd,todayISO);
+            const actD=actCalc(dYd,dMd,dDd);
+            const prodD=tf.cS*actD.final;
+            if(cap150d<=0){penToday=+(prodD*cY_d/40).toFixed(0);}
+            else if(prodD>cap150d){penToday=+(cap150d*tY_d/40).toFixed(0);}
+            else{penToday=+(prodD*cY_d/40+cap150d*iY_d/40).toFixed(0);}
+          }
+        } else {
+          penToday=Math.max(0,+(tD.oM*cap150d/600+tD.nM*cap150d/480+tD.vM*cap150d/480).toFixed(0));
+        }
+        penToday=Math.max(0,penToday);
+        const penFull=pen.f;
+
+        return(
+          <div style={{...crd,marginBottom:12}}>
+            <SH icon="📊" label="ملخص المدد الزمنية" color={gold}/>
+
+            {/* الدائرة — في المنتصف */}
+            <div style={{display:'flex',justifyContent:'center',marginBottom:16}}>
+              <div style={{position:'relative',width:S,flexShrink:0}}>
+                <svg viewBox={`0 0 ${S} ${S}`} style={{width:'100%',display:'block',filter:'drop-shadow(0 6px 20px rgba(0,0,0,0.10))'}}>
+                  {paths.map((p,i)=><path key={i} d={p.d} fill={p.clr} stroke={bg2} strokeWidth="2.5"/>)}
+                  <circle cx={cx} cy={cy} r={IR-3} fill={bg2}/>
+                  <text x={cx} y={cy-22} textAnchor="middle" fontSize="8" fill={txt2} fontFamily="Tajawal,sans-serif">حتى اليوم</text>
+                  <text x={cx} y={cy-8} textAnchor="middle" fontSize="24" fontWeight="900" fill={gold2} fontFamily="Tajawal,sans-serif">{Math.floor(todayTotal)}</text>
+                  <text x={cx} y={cy+8} textAnchor="middle" fontSize="9" fill={txt2} fontFamily="Tajawal,sans-serif">من {Math.floor(fullTotal)} شهر</text>
+                  <text x={cx} y={cy+20} textAnchor="middle" fontSize="8" fill={txt2} fontFamily="Tajawal,sans-serif">{(todayTotal/12).toFixed(1)} / {(fullTotal/12).toFixed(1)} سنة</text>
+                </svg>
+              </div>
+            </div>
+
+            {/* مفتاح الألوان */}
+            <div style={{display:'flex',justifyContent:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
+              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:txt2}}>
+                <div style={{width:12,height:8,borderRadius:3,background:types[0]?.clr||gold}}/>فعلي (حتى اليوم)
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:txt2}}>
+                <div style={{width:12,height:8,borderRadius:3,background:'#CBD5E1'}}/>مخطط (حتى التقاعد)
+              </div>
+            </div>
+
+            {/* بطاقات الأنواع — 3 مستطيلات */}
+            {(()=>{
+              const insurA=tD.oM+tD.nM+tD.vM;
+              const govA=tD.cM+tD.wM;
+              const planAll=fullTotal-todayTotal;
+              const three=[
+                {lb:'تأمينات',val:insurA,clr:blu,gray:false,
+                  rows:[...(tD.oM?[{lb:'قديم',val:tD.oM}]:[]),...(tD.nM?[{lb:'1421',val:tD.nM}]:[]),...(tD.vM?[{lb:'اختياري',val:tD.vM}]:[])],
+                },
+                {lb:'مدني/عسكري',val:govA,clr:'#14B8A6',gray:false,
+                  rows:[...(tD.cM?[{lb:'مدني',val:tD.cM}]:[]),...(tD.wM?[{lb:'عسكري',val:tD.wM}]:[])],
+                },
+                {lb:'مخطط',val:planAll,clr:'#94A3B8',gray:true,
+                  rows:[{lb:'حتى التقاعد',val:planAll}],
+                },
+              ].filter(t=>t.val>0);
+              return(
+                <div style={{display:'grid',gridTemplateColumns:`repeat(${three.length},1fr)`,gap:8,marginBottom:12}}>
+                  {three.map((t,i)=>(
+                    <div key={i} style={{background:t.gray?'#F8FAFC':bg,borderRadius:14,padding:'12px 10px',border:`1.5px solid ${t.gray?'#E2E8F0':t.clr+'25'}`}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:8}}>
+                        <div style={{width:8,height:8,borderRadius:3,background:t.clr,flexShrink:0}}/>
+                        <span style={{fontSize:10,fontWeight:700,color:t.gray?'#64748B':txt}}>{t.lb}</span>
+                        <span style={{fontSize:8,color:txt2,marginRight:'auto'}}>÷480</span>
+                      </div>
+                      <div style={{fontSize:14,fontWeight:900,color:t.clr,lineHeight:1.3,marginBottom:6}}>{fMD(t.val)}</div>
+                      <div style={{fontSize:8,color:txt2,marginBottom:4}}>{(t.val*100/(fullTotal||1)).toFixed(0)}%</div>
+                      {t.rows.length>1&&(
+                        <div style={{display:'flex',flexDirection:'column',gap:3,borderTop:`1px solid ${brd}`,paddingTop:6}}>
+                          {t.rows.map((r,j)=>(
+                            <div key={j} style={{display:'flex',justifyContent:'space-between',fontSize:8}}>
+                              <span style={{color:txt2}}>{r.lb}</span>
+                              <strong style={{color:t.clr}}>{fMD(r.val)}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* إجمالي + احتساب مستقل */}
+            <div style={{display:'flex',alignItems:'center',gap:0}}>
+              <div style={{flex:1,background:goldL,borderRadius:14,padding:'12px 6px',textAlign:'center',border:`1px solid ${gold}25`}}>
+                <div style={{fontSize:8,color:txt2,marginBottom:2,fontWeight:500}}>حتى اليوم</div>
+                <div style={{fontSize:14,fontWeight:900,color:gold2,lineHeight:1.2}}>{fMD(todayTotal)}</div>
+                <div style={{fontSize:8,color:txt2,marginTop:2}}>{(todayTotal/12).toFixed(1)} سنة</div>
+              </div>
+              <div style={{fontSize:18,fontWeight:900,color:'#CBD5E1',padding:'0 6px',flexShrink:0,userSelect:'none'}}>+</div>
+              <div style={{flex:1,background:'#F1F5F9',borderRadius:14,padding:'12px 6px',textAlign:'center',border:'1px solid #E2E8F0'}}>
+                <div style={{fontSize:8,color:'#94A3B8',marginBottom:2,fontWeight:500}}>مخطط إضافي</div>
+                <div style={{fontSize:14,fontWeight:900,color:'#94A3B8',lineHeight:1.2}}>{fMD(Math.max(0,fullTotal-todayTotal))}</div>
+                <div style={{fontSize:8,color:'#94A3B8',marginTop:2}}>{((fullTotal-todayTotal)/12).toFixed(1)} سنة</div>
+              </div>
+              <div style={{fontSize:18,fontWeight:900,color:'#CBD5E1',padding:'0 6px',flexShrink:0,userSelect:'none'}}>=</div>
+              <div style={{flex:1,background:bg,borderRadius:14,padding:'12px 6px',textAlign:'center',border:`1px solid ${brd}`}}>
+                <div style={{fontSize:8,color:txt2,marginBottom:2,fontWeight:500}}>الإجمالي عند التقاعد</div>
+                <div style={{fontSize:14,fontWeight:900,color:gold,lineHeight:1.2}}>{fMD(fullTotal)}</div>
+                <div style={{fontSize:8,color:txt2,marginTop:2}}>{(fullTotal/12).toFixed(1)} سنة</div>
+              </div>
+            </div>
+
+            {/* احتساب مستقل للمعاش */}
+            {info.rd&&todayTotal>0&&(
+              <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div style={{background:goldL,borderRadius:12,padding:'10px',textAlign:'center',border:`1px solid ${gold}30`}}>
+                  <div style={{fontSize:8,color:txt2,marginBottom:3}}>معاش لو تقاعدت اليوم</div>
+                  <div style={{fontSize:18,fontWeight:900,color:gold2}}>{fmt(penToday)}</div>
+                  <div style={{fontSize:8,color:txt2}}>ر.س / شهر</div>
+                </div>
+                <div style={{background:bg,borderRadius:12,padding:'10px',textAlign:'center',border:`1px solid ${brd}`}}>
+                  <div style={{fontSize:8,color:txt2,marginBottom:3}}>معاش عند التقاعد المخطط</div>
+                  <div style={{fontSize:18,fontWeight:900,color:gold}}>{fmt(penFull)}</div>
+                  <div style={{fontSize:8,color:txt2}}>ر.س / شهر</div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ══ مقارنة السيناريوهات (مدد مختلطة) ══ */}
       {hasMixedSys&&tf.has&&(()=>{
@@ -865,8 +1158,8 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         return(
           <div style={{...crd,marginBottom:14}}>
             <SH icon="⚖️" label="مقارنة سيناريوهات الضم" color={gold}/>
-            <div style={{overflowX:'auto',marginRight:-18,marginLeft:-18,paddingRight:18,paddingLeft:18,paddingBottom:8}}>
-              <div style={{display:'flex',gap:10,width:'max-content'}}>
+            <div style={{overflowX:'auto',paddingBottom:8}}>
+              <div style={{display:'flex',gap:10,justifyContent:'center',minWidth:'min-content',margin:'0 auto'}}>
                 {scenarios.map(sc=>(
                   <div key={sc.id} style={{width:210,borderRadius:18,overflow:'hidden',border:`1.5px solid ${sc.clr}30`,boxShadow:'0 2px 14px rgba(0,0,0,0.07)',flexShrink:0,display:'flex',flexDirection:'column'}}>
 
@@ -918,214 +1211,6 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         );
       })()}
 
-      {/* الوضع الحالي */}
-      {info.bd&&(
-        <div style={{background:'linear-gradient(135deg,rgba(42,74,56,0.4),rgba(26,56,42,0.3))',borderRadius:14,padding:'12px 14px',marginBottom:12,border:`1px solid ${brd}`}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-            <span style={{fontSize:12}}>📊</span><span style={{fontSize:12,fontWeight:700,color:gold2}}>وضعك الحالي</span>
-            {ri.ex&&<Tag color={grn} bg={grnL} sm>غير مشمول</Tag>}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
-            <div style={{background:card,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${brd}`}}>
-              <div style={{fontSize:8,color:txt2,marginBottom:1}}>المدة المتراكمة</div>
-              <div style={{fontSize:18,fontWeight:800,color:gold2}}>{fI(ps.tM)}</div>
-              <div style={{fontSize:8,color:txt2}}>شهر</div>
-            </div>
-            <div style={{background:card,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${brd}`}}>
-              <div style={{fontSize:8,color:txt2,marginBottom:1}}>السن النظامي</div>
-              <div style={{fontSize:11,fontWeight:800,color:gold2}}>{ri.lb}</div>
-              {ri.dt&&<div style={{fontSize:7,color:txt2}}>{ri.dt.toLocaleDateString('ar-SA')}</div>}
-            </div>
-            <div style={{background:ps.tM>=ri.eR?grnL:redL,borderRadius:10,padding:'8px 10px',textAlign:'center',border:`1px solid ${ps.tM>=ri.eR?grn:red}30`}}>
-              <div style={{fontSize:8,color:txt2,marginBottom:1}}>التقاعد المبكر</div>
-              {ps.tM>=ri.eR
-                ?<div style={{fontSize:11,fontWeight:700,color:grn}}>✓ مؤهل</div>
-                :<><div style={{fontSize:11,fontWeight:700,color:red}}>متبقٍ</div><div style={{fontSize:12,fontWeight:800,color:red}}>{ri.eR-ps.tM}<span style={{fontSize:8}}> ش</span></div></>
-              }
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── عداد الأشهر الدائري ── */}
-      {(()=>{
-        const todayISO=new Date().toISOString().split('T')[0];
-        // أشهر حتى اليوم
-        let tD={oM:0,nM:0,vM:0,cM:0,wM:0};
-        periods.filter(p=>p.st!=='مستبعد'&&p.sd&&new Date(p.sd)<=new Date(todayISO)).forEach(p=>{
-          const raw=p.ac?todayISO:(p.ed||'');
-          const e=raw>todayISO?todayISO:raw;
-          if(!e)return;
-          const c=mdfCal(p.sd,e,p.cal||'g');const m=c.t;
-          if(p.sy==='تقاعد مدني')tD.cM+=m;else if(p.sy==='تقاعد عسكري')tD.wM+=m;
-          else if(p.sy==='اشتراك اختياري')tD.vM+=m;
-          else{new Date(p.sd)<new Date('2001-04-25')?tD.oM+=m:tD.nM+=m}
-        });
-        const todayTotal=tD.oM+tD.nM+tD.vM+tD.cM+tD.wM;
-        const fullTotal=ps.tM;
-        if(!fullTotal)return null;
-
-        // أنواع المدد
-        const types=[
-          {lb:'تأمينات قديم',actual:tD.oM,plan:ps.oM-tD.oM,clr:org,sub:'÷600'},
-          {lb:'تأمينات 1421',actual:tD.nM,plan:ps.nM-tD.nM,clr:blu,sub:'÷480'},
-          {lb:'مدني/عسكري',actual:tD.cM+tD.wM,plan:(ps.cM+ps.wM)-(tD.cM+tD.wM),clr:'#14B8A6',sub:'÷480'},
-          {lb:'اختياري',actual:tD.vM,plan:ps.vM-tD.vM,clr:pur,sub:'÷480'},
-        ].filter(t=>t.actual+t.plan>0);
-
-        // بناء القطاعات: ملون=فعلي، رمادي=مخطط
-        const allSegs=[];
-        types.forEach(t=>{
-          if(t.actual>0)allSegs.push({val:t.actual,clr:t.clr,real:true});
-          if(t.plan>0)allSegs.push({val:t.plan,clr:'#CBD5E1',real:false});
-        });
-
-        const S=210,OR=86,IR=58,cx=S/2,cy=S/2;
-        const GAP=allSegs.length>1?0.022:0;
-        const usable=2*Math.PI-allSegs.length*GAP;
-        let ang=-Math.PI/2;
-        const paths=allSegs.map(s=>{
-          const sw=s.val/fullTotal*usable;
-          const sa=ang+GAP/2,ea=sa+sw;ang=ea+GAP/2;
-          const la=sw>Math.PI?1:0;
-          const px=(v,r)=>(cx+r*Math.cos(v)).toFixed(2),py=(v,r)=>(cy+r*Math.sin(v)).toFixed(2);
-          return{...s,d:`M${px(sa,OR)} ${py(sa,OR)} A${OR} ${OR} 0 ${la} 1 ${px(ea,OR)} ${py(ea,OR)} L${px(ea,IR)} ${py(ea,IR)} A${IR} ${IR} 0 ${la} 0 ${px(sa,IR)} ${py(sa,IR)} Z`};
-        });
-
-        // احتساب المعاش حتى اليوم — نفس منطق المعاش الحالي
-        const lSd=ps.lS||0;
-        const cap150d=s60?Math.min(lSd,s60*1.5):lSd;
-        let penToday=0;
-        if(tf.has&&tf.cEnd){
-          const cY_d=tf.cM/12,iM_d=tD.oM+tD.nM+tD.vM,iY_d=iM_d/12,tY_d=cY_d+iY_d;
-          if(tf.lastSys==='تقاعد'){
-            penToday=+(tf.cS*tY_d/40).toFixed(0);
-          } else {
-            const{dY:dYd,dM:dMd,dD:dDd}=hijriGap(tf.cEnd,todayISO);
-            const actD=actCalc(dYd,dMd,dDd);
-            const prodD=tf.cS*actD.final;
-            if(cap150d<=0){penToday=+(prodD*cY_d/40).toFixed(0);}
-            else if(prodD>cap150d){penToday=+(cap150d*tY_d/40).toFixed(0);}
-            else{penToday=+(prodD*cY_d/40+cap150d*iY_d/40).toFixed(0);}
-          }
-        } else {
-          penToday=Math.max(0,+(tD.oM*cap150d/600+tD.nM*cap150d/480+tD.vM*cap150d/480).toFixed(0));
-        }
-        penToday=Math.max(0,penToday);
-        const penFull=pen.f;
-
-        return(
-          <div style={{...crd,marginBottom:12}}>
-            <SH icon="📊" label="ملخص المدد الزمنية" color={gold}/>
-
-            {/* الدائرة — في المنتصف */}
-            <div style={{display:'flex',justifyContent:'center',marginBottom:16}}>
-              <div style={{position:'relative',width:S,flexShrink:0}}>
-                <svg viewBox={`0 0 ${S} ${S}`} style={{width:'100%',display:'block',filter:'drop-shadow(0 6px 20px rgba(0,0,0,0.10))'}}>
-                  {paths.map((p,i)=><path key={i} d={p.d} fill={p.clr} stroke={bg2} strokeWidth="2.5"/>)}
-                  <circle cx={cx} cy={cy} r={IR-3} fill={bg2}/>
-                  <text x={cx} y={cy-22} textAnchor="middle" fontSize="8" fill={txt2} fontFamily="Tajawal,sans-serif">حتى اليوم</text>
-                  <text x={cx} y={cy-8} textAnchor="middle" fontSize="24" fontWeight="900" fill={gold2} fontFamily="Tajawal,sans-serif">{todayTotal}</text>
-                  <text x={cx} y={cy+8} textAnchor="middle" fontSize="9" fill={txt2} fontFamily="Tajawal,sans-serif">من {fullTotal} شهر</text>
-                  <text x={cx} y={cy+20} textAnchor="middle" fontSize="8" fill={txt2} fontFamily="Tajawal,sans-serif">{(todayTotal/12).toFixed(1)} / {(fullTotal/12).toFixed(1)} سنة</text>
-                </svg>
-              </div>
-            </div>
-
-            {/* مفتاح الألوان */}
-            <div style={{display:'flex',justifyContent:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:txt2}}>
-                <div style={{width:12,height:8,borderRadius:3,background:types[0]?.clr||gold}}/>فعلي (حتى اليوم)
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:txt2}}>
-                <div style={{width:12,height:8,borderRadius:3,background:'#CBD5E1'}}/>مخطط (حتى التقاعد)
-              </div>
-            </div>
-
-            {/* بطاقات الأنواع — 3 مستطيلات */}
-            {(()=>{
-              const insurA=tD.oM+tD.nM+tD.vM;
-              const govA=tD.cM+tD.wM;
-              const planAll=fullTotal-todayTotal;
-              const three=[
-                {lb:'تأمينات',val:insurA,clr:blu,gray:false,
-                  rows:[...(tD.oM?[{lb:'قديم',val:tD.oM}]:[]),...(tD.nM?[{lb:'1421',val:tD.nM}]:[]),...(tD.vM?[{lb:'اختياري',val:tD.vM}]:[])],
-                },
-                {lb:'مدني/عسكري',val:govA,clr:'#14B8A6',gray:false,
-                  rows:[...(tD.cM?[{lb:'مدني',val:tD.cM}]:[]),...(tD.wM?[{lb:'عسكري',val:tD.wM}]:[])],
-                },
-                {lb:'مخطط',val:planAll,clr:'#94A3B8',gray:true,
-                  rows:[{lb:'حتى التقاعد',val:planAll}],
-                },
-              ].filter(t=>t.val>0);
-              return(
-                <div style={{display:'grid',gridTemplateColumns:`repeat(${three.length},1fr)`,gap:8,marginBottom:12}}>
-                  {three.map((t,i)=>(
-                    <div key={i} style={{background:t.gray?'#F8FAFC':bg,borderRadius:14,padding:'12px 10px',border:`1.5px solid ${t.gray?'#E2E8F0':t.clr+'25'}`}}>
-                      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:8}}>
-                        <div style={{width:8,height:8,borderRadius:3,background:t.clr,flexShrink:0}}/>
-                        <span style={{fontSize:10,fontWeight:700,color:t.gray?'#64748B':txt}}>{t.lb}</span>
-                        <span style={{fontSize:8,color:txt2,marginRight:'auto'}}>÷480</span>
-                      </div>
-                      <div style={{fontSize:26,fontWeight:900,color:t.clr,lineHeight:1,marginBottom:6}}>{t.val}</div>
-                      <div style={{fontSize:8,color:txt2,marginBottom:4}}>{(t.val*100/(fullTotal||1)).toFixed(0)}%</div>
-                      {t.rows.length>1&&(
-                        <div style={{display:'flex',flexDirection:'column',gap:3,borderTop:`1px solid ${brd}`,paddingTop:6}}>
-                          {t.rows.map((r,j)=>(
-                            <div key={j} style={{display:'flex',justifyContent:'space-between',fontSize:8}}>
-                              <span style={{color:txt2}}>{r.lb}</span>
-                              <strong style={{color:t.clr}}>{r.val}</strong>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-
-            {/* إجمالي + احتساب مستقل */}
-            <div style={{display:'flex',alignItems:'center',gap:0}}>
-              <div style={{flex:1,background:goldL,borderRadius:14,padding:'12px 6px',textAlign:'center',border:`1px solid ${gold}25`}}>
-                <div style={{fontSize:8,color:txt2,marginBottom:2,fontWeight:500}}>حتى اليوم</div>
-                <div style={{fontSize:22,fontWeight:900,color:gold2,lineHeight:1}}>{todayTotal}</div>
-                <div style={{fontSize:8,color:txt2,marginTop:2}}>{(todayTotal/12).toFixed(1)} سنة</div>
-              </div>
-              <div style={{fontSize:18,fontWeight:900,color:'#CBD5E1',padding:'0 6px',flexShrink:0,userSelect:'none'}}>+</div>
-              <div style={{flex:1,background:'#F1F5F9',borderRadius:14,padding:'12px 6px',textAlign:'center',border:'1px solid #E2E8F0'}}>
-                <div style={{fontSize:8,color:'#94A3B8',marginBottom:2,fontWeight:500}}>مخطط إضافي</div>
-                <div style={{fontSize:22,fontWeight:900,color:'#94A3B8',lineHeight:1}}>{fullTotal-todayTotal}</div>
-                <div style={{fontSize:8,color:'#94A3B8',marginTop:2}}>{((fullTotal-todayTotal)/12).toFixed(1)} سنة</div>
-              </div>
-              <div style={{fontSize:18,fontWeight:900,color:'#CBD5E1',padding:'0 6px',flexShrink:0,userSelect:'none'}}>=</div>
-              <div style={{flex:1,background:bg,borderRadius:14,padding:'12px 6px',textAlign:'center',border:`1px solid ${brd}`}}>
-                <div style={{fontSize:8,color:txt2,marginBottom:2,fontWeight:500}}>الإجمالي عند التقاعد</div>
-                <div style={{fontSize:22,fontWeight:900,color:gold,lineHeight:1}}>{fullTotal}</div>
-                <div style={{fontSize:8,color:txt2,marginTop:2}}>{(fullTotal/12).toFixed(1)} سنة</div>
-              </div>
-            </div>
-
-            {/* احتساب مستقل للمعاش */}
-            {info.rd&&todayTotal>0&&(
-              <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div style={{background:goldL,borderRadius:12,padding:'10px',textAlign:'center',border:`1px solid ${gold}30`}}>
-                  <div style={{fontSize:8,color:txt2,marginBottom:3}}>معاش لو تقاعدت اليوم</div>
-                  <div style={{fontSize:18,fontWeight:900,color:gold2}}>{fmt(penToday)}</div>
-                  <div style={{fontSize:8,color:txt2}}>ر.س / شهر</div>
-                </div>
-                <div style={{background:bg,borderRadius:12,padding:'10px',textAlign:'center',border:`1px solid ${brd}`}}>
-                  <div style={{fontSize:8,color:txt2,marginBottom:3}}>معاش عند التقاعد المخطط</div>
-                  <div style={{fontSize:18,fontWeight:900,color:gold}}>{fmt(penFull)}</div>
-                  <div style={{fontSize:8,color:txt2}}>ر.س / شهر</div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-
       {/* مقارنة المعاش الحالي والمتوقع */}
       {(()=>{
         const todayISO=new Date().toISOString().split('T')[0];
@@ -1138,7 +1223,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         });
         // المعاش الحالي: تاريخ اليوم = تاريخ التقاعد، آخر أجر = متوسط الـ24 شهر (افتراض)
         const lS=ps.lS||0;
-        const cap150=s60?Math.min(lS,s60*1.5):lS;
+        const cap150=s60?Math.min(lS,Math.min(s60*1.5,45000)):Math.min(lS,45000);
         const iM_today=tD2.oM+tD2.nM+tD2.vM;
         let penNow=0,penCivil=0,penIns=0;
         if(tf.has&&tf.cEnd){
@@ -1324,7 +1409,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
             <span style={{fontSize:11,color:txt2}}>{row.lb}</span><strong style={{fontSize:13,color:row.clr}}>{row.p?'+':''}{fmt(row.val)}</strong>
           </div>
         ))}
-        <div style={{display:'flex',justifyContent:'space-between',paddingTop:10,fontSize:11}}><span style={{fontWeight:700}}>إجمالي المدة</span><span style={{color:txt2}}>{ps.tM} شهر ({(ps.tM/12).toFixed(1)} سنة)</span></div>
+        <div style={{display:'flex',justifyContent:'space-between',paddingTop:10,fontSize:11}}><span style={{fontWeight:700}}>إجمالي المدة</span><span style={{color:txt2}}>{fMD(ps.tM)} ({(ps.tM/12).toFixed(1)} سنة)</span></div>
       </div>
 
       {/* تبادل المنافع */}
@@ -1383,6 +1468,52 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
     {/* ════ تبويب خطة التحسين ════ */}
     {tab==='improve'&&(<div>
 
+      {/* أجور آخر 24 شهر — تخطيط عمودين */}
+      <div style={{display:'flex',alignItems:'center',gap:10,margin:'0 0 8px'}}>
+        <div style={{flex:1,height:1,background:brd}}/><div style={{fontSize:11,color:txt2,whiteSpace:'nowrap'}}>أجور آخر 24 شهر</div><div style={{flex:1,height:1,background:brd}}/>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12,alignItems:'start'}}>
+
+        {/* اليمين: جدول الأجور */}
+        <div style={{background:card,borderRadius:16,padding:'10px 8px',border:`1px solid ${brd}`,boxShadow:'0 2px 8px rgba(0,0,0,0.05)'}}>
+          <div style={{fontSize:11,fontWeight:700,color:gold2,marginBottom:6}}>💰 أجر كل شهر</div>
+          <button onClick={()=>setSals(s24.map(()=>ps.lS||0))} style={{padding:'5px 8px',borderRadius:8,border:`1px solid ${pur}`,background:purL,color:pur,fontWeight:700,fontSize:9,cursor:'pointer',fontFamily:'inherit',marginBottom:6,width:'100%'}}>↙ تعبئة بآخر أجر ({fI(ps.lS)} ر.س)</button>
+          <div style={{borderRadius:10,border:`1px solid ${brd}`,overflow:'hidden',maxHeight:400,overflowY:'auto'}}>
+            {s24.map((l,i)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'auto 1fr',padding:'2px 5px',borderBottom:`1px solid ${brd}`,background:i%2===0?bg2:card,alignItems:'center',gap:3}}>
+                <div style={{fontSize:7.5,fontWeight:600,color:gold2,minWidth:38,lineHeight:1.3}}>{l.split(' ')[0]}<br/>{l.split(' ')[1]}</div>
+                <div style={{display:'flex',gap:2,alignItems:'center'}}>
+                  <input type="number" value={sals[i]||''} placeholder="0" onChange={e=>{const c=[...sals];c[i]=+e.target.value;setSals(c)}} style={{...inp,flex:1,minWidth:0,direction:'ltr',textAlign:'center',padding:'3px 4px',fontSize:11}}/>
+                  {sals[i]>0&&<button onClick={()=>setSals(prev=>prev.map((s,j)=>j>i?sals[i]:s))} style={{padding:'3px 5px',borderRadius:6,border:`1px solid ${gold}50`,background:goldL,color:gold2,fontSize:8,cursor:'pointer',fontFamily:'inherit',flexShrink:0,lineHeight:1}}>↓</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* اليسار: المتوسط + 150% */}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{background:`linear-gradient(135deg,${gold} 0%,#10B981 100%)`,borderRadius:16,padding:'16px 10px',textAlign:'center',boxShadow:`0 6px 20px ${gold}30`}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,0.75)',letterSpacing:1.5,marginBottom:3,fontWeight:500}}>متوسط آخر 24 شهر</div>
+            <div style={{fontSize:30,fontWeight:900,color:'#FFFFFF',lineHeight:1}}>{fmt(avg)}</div>
+            <div style={{fontSize:9,color:'rgba(255,255,255,0.6)',marginTop:3}}>ريال سعودي</div>
+          </div>
+          {s60>0&&(
+            <div style={{background:card,borderRadius:14,padding:'10px 10px',border:`1px solid ${brd}`,boxShadow:'0 2px 8px rgba(0,0,0,0.05)'}}>
+              <div style={{fontSize:11,fontWeight:700,color:blu,marginBottom:6}}>📐 قاعدة 150%</div>
+              <div style={{fontSize:10,lineHeight:2}}>
+                <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0',borderBottom:`1px solid ${brd2}`}}><span style={{color:txt2,fontSize:9}}>أجر الشهر 60</span><strong style={{color:blu}}>{fI(s60)}</strong></div>
+                <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span style={{color:txt2,fontSize:9}}>الحد 150%</span><strong>{fI(r150.l)}</strong></div>
+                {r150.on&&<div style={{background:r150.ov?redL:grnL,borderRadius:8,padding:'6px 8px',marginTop:4,fontWeight:700,color:r150.ov?red:grn,fontSize:10,border:`1px solid ${r150.ov?red:grn}30`}}>{r150.ov?`تجاوز → ${fI(r150.l)} ر.س`:`ضمن الحد → ${fmt(r150.app)} ر.س`}</div>}
+              </div>
+            </div>
+          )}
+          <div style={{background:bluL,borderRadius:10,padding:'8px 10px',fontSize:9,color:blu,lineHeight:1.7,border:`1px solid ${blu}20`}}>
+            💡 متوسط آخر 24 شهر هو أساس حساب معاشك. اضغط ↓ لنسخ الأجر للصفوف التالية.
+          </div>
+        </div>
+      </div>
+
       {/* المعاش المستهدف */}
       <div style={{...crd,marginBottom:12}}>
         <SH icon="🎯" label="المعاش المستهدف" color={gold}/>
@@ -1400,65 +1531,98 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
         <SH icon="💡" label="خطة تحسين المعاش" color={gold}/>
 
         {/* الشرح الاحترافي */}
-        <div style={{background:`linear-gradient(135deg,${goldL} 0%,rgba(255,255,255,0) 100%)`,borderRadius:16,padding:'16px 16px',marginBottom:14,border:`1px solid ${gold}25`,position:'relative',overflow:'hidden'}}>
-          <div style={{position:'absolute',top:-20,left:-20,width:100,height:100,background:`radial-gradient(circle,${gold}12,transparent 70%)`,pointerEvents:'none'}}/>
-          <div style={{position:'relative'}}>
-            <div style={{fontSize:13,fontWeight:800,color:gold2,marginBottom:10,lineHeight:1.5}}>
-              كيف تزيد معاشك التقاعدي؟
-            </div>
-            <div style={{fontSize:11,color:txt,lineHeight:2,marginBottom:12}}>
-              يُتيح نظام التأمينات الاجتماعية للمشترك رفع قيمة معاشه التقاعدي من خلال مسارين مستقلين يمكن الجمع بينهما:
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              <div style={{display:'flex',gap:12,alignItems:'flex-start',background:bg2,borderRadius:12,padding:'12px 12px',border:`1px solid ${blu}20`}}>
-                <div style={{width:32,height:32,borderRadius:10,background:bluL,border:`1px solid ${blu}25`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>📌</div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:blu,marginBottom:3}}>الاشتراك الإلزامي</div>
-                  <div style={{fontSize:10,color:txt2,lineHeight:1.8}}>يُحتسب بنسبة <strong style={{color:txt}}>9%</strong> من الأجر الشهري على عاتق الموظف، و<strong style={{color:txt}}>12%</strong> على عاتق جهة العمل. تؤثر الزيادات السنوية في الأجر مباشرةً على حجم المعاش المستقبلي وفق معادلة الاحتساب.</div>
-                </div>
-              </div>
-              <div style={{display:'flex',gap:12,alignItems:'flex-start',background:bg2,borderRadius:12,padding:'12px 12px',border:`1px solid ${pur}20`}}>
-                <div style={{width:32,height:32,borderRadius:10,background:purL,border:`1px solid ${pur}25`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>📊</div>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:pur,marginBottom:3}}>الاشتراك الاختياري</div>
-                  <div style={{fontSize:10,color:txt2,lineHeight:1.8}}>يُمكّن المشترك من رفع شريحة أجره الاشتراكية بنسبة تصل إلى <strong style={{color:txt}}>10% سنوياً</strong> وفق المادة 24 من لائحة التسجيل، بتكلفة شهرية قدرها <strong style={{color:txt}}>18%</strong> من قيمة الشريحة المختارة. كل شهر إضافي يُضاف مباشرةً إلى رصيد مدة الاشتراك.</div>
-                </div>
-              </div>
-            </div>
-            <div style={{marginTop:12,padding:'10px 12px',borderRadius:10,background:`${gold}10`,border:`1px solid ${gold}20`,fontSize:10,color:txt2,lineHeight:1.8}}>
-              <strong style={{color:gold2}}>📋 الجداول أدناه</strong> توضح التكلفة الشهرية والسنوية لكلٍّ من المسارين بناءً على بياناتك، مع تقدير أثر كل سنة إضافية على قيمة معاشك.
-            </div>
-          </div>
+        <div style={{background:'#F8FAFC',borderRadius:10,padding:'9px 12px',marginBottom:12,border:'1px solid #E2E8F0',fontSize:9,color:'#4B5563',lineHeight:2}}>
+          <span style={{fontWeight:700,color:gold2}}>💡 كيف يعمل؟ </span>
+          يمكنك زيادة معاشك عبر مسارين:{' '}
+          <span style={{color:blu,fontWeight:600}}>📌 إلزامي</span> — كل زيادة في راتبك ترفع معاشك (9% موظف + 12% جهة)،{' '}
+          <span style={{color:pur,fontWeight:600}}>📊 اختياري</span> — ترفع شريحتك 10% سنوياً بتكلفة 18% من الشريحة شهرياً (م.24 لائحة التسجيل).
+          {is50H&&<><br/><span style={{color:org,fontWeight:600}}>⚠️ تنبيه: </span>عمرك تجاوز 50 سنة هجرية — الزيادة القصوى 10% سنوياً على الشريحة السابقة.</>}
         </div>
-
-        {is50H&&<Note icon="⚠️" text="تنبيه (المادة 24): عمرك تجاوز 50 سنة هجرية — الزيادة القصوى 10% سنوياً على الشريحة السابقة." color={org} bgc={orgL}/>}
 
         {/* جدولا الاشتراك */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
-          {/* اختياري */}
-          <div style={{background:purL,borderRadius:12,padding:10,border:`1px solid ${pur}25`}}>
-            <div style={{fontSize:11,fontWeight:700,color:pur,marginBottom:4}}>📊 اختياري
-              <div style={{fontSize:8,fontWeight:400,color:txt2}}>18% × الشريحة</div>
+
+          {/* ── اختياري ── */}
+          <div style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${pur}30`,boxShadow:`0 2px 10px ${pur}10`}}>
+            <div style={{background:`linear-gradient(135deg,${pur},#9333EA)`,padding:'8px 10px'}}>
+              <div style={{fontSize:11,fontWeight:800,color:'#fff'}}>📊 اشتراك اختياري</div>
+              <div style={{fontSize:7.5,color:'rgba(255,255,255,0.75)',marginTop:1}}>18% من شريحة الأجر شهرياً</div>
             </div>
-            <table style={{width:'100%',fontSize:8,borderCollapse:'collapse'}}>
-              <thead><tr>{['السنة','الشريحة','الاشتراك الشهري','التكلفة السنوية'].map(h=><th key={h} style={{padding:'4px 2px',textAlign:'right',color:pur,fontWeight:700,borderBottom:`1px solid ${pur}25`}}>{h}</th>)}</tr></thead>
-              <tbody>{optRows.map(r=><tr key={r.y} style={{borderBottom:`1px solid ${brd2}`}}><td style={{padding:'4px 2px',fontWeight:600,color:txt}}>{r.y}</td><td style={{padding:'4px 2px',color:txt2}}>{fI(r.b)}</td><td style={{padding:'4px 2px',fontWeight:700,color:pur}}>{fI(r.opt)}</td><td style={{padding:'4px 2px',fontWeight:700,color:gold}}>{fI(r.b*0.18*12)}</td></tr>)}</tbody>
-            </table>
+            <div style={{background:purL,padding:'0 0 6px'}}>
+              <table style={{width:'100%',fontSize:8,borderCollapse:'collapse'}}>
+                <thead>
+                  <tr style={{background:`${pur}12`}}>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:pur,fontWeight:700,borderBottom:`1px solid ${pur}25`,fontSize:7.5}}>السنة</th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:txt2,fontWeight:600,borderBottom:`1px solid ${pur}25`,fontSize:7.5}}>الشريحة</th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:pur,fontWeight:800,borderBottom:`1px solid ${pur}25`,fontSize:8}}>شهري<br/><span style={{fontSize:6.5,fontWeight:500,color:txt2}}>(ر.س)</span></th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:gold2,fontWeight:700,borderBottom:`1px solid ${pur}25`,fontSize:7.5}}>سنوي<br/><span style={{fontSize:6.5,fontWeight:400,color:txt2}}>(ر.س)</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {optRows.map((r,i)=>(
+                    <tr key={r.y} style={{background:i%2===0?'rgba(255,255,255,0.6)':'transparent',borderBottom:`1px solid ${brd2}`}}>
+                      <td style={{padding:'4px 5px',fontWeight:600,color:txt,fontSize:8}}>{r.y}</td>
+                      <td style={{padding:'4px 5px',color:txt2,fontSize:7.5}}>{fI(r.b)}</td>
+                      <td style={{padding:'4px 5px',fontWeight:900,color:pur,fontSize:9.5}}>{fI(r.opt)}</td>
+                      <td style={{padding:'4px 5px',fontWeight:700,color:gold2,fontSize:8}}>{fI(r.b*0.18*12)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:`${pur}15`,borderTop:`1.5px solid ${pur}30`}}>
+                    <td colSpan={2} style={{padding:'5px 5px',fontWeight:800,color:pur,fontSize:8.5}}>الإجمالي التراكمي</td>
+                    <td style={{padding:'5px 5px',fontSize:7,color:txt2}}>—</td>
+                    <td style={{padding:'5px 5px',fontWeight:900,color:pur,fontSize:9}}>{fI(Math.round(optRows.reduce((s,r)=>s+r.b*0.18*12,0)))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-          {/* إلزامي */}
-          <div style={{background:bluL,borderRadius:12,padding:10,border:`1px solid ${blu}25`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-              <div style={{fontSize:11,fontWeight:700,color:blu}}>📌 إلزامي<div style={{fontSize:8,fontWeight:400,color:txt2}}>9% موظف + 12% جهة</div></div>
-              <div style={{display:'flex',alignItems:'center',gap:4}}>
-                <span style={{fontSize:8,color:txt2}}>زيادة%:</span>
-                <input type="number" value={mandRaise} onChange={e=>setMandRaise(Math.max(0,Math.min(50,+e.target.value)))} style={{width:36,padding:'2px 4px',borderRadius:6,border:`1px solid ${blu}40`,fontSize:9,textAlign:'center',fontFamily:'inherit',background:'rgba(0,0,0,0.2)',color:txt}}/>
+
+          {/* ── إلزامي ── */}
+          <div style={{borderRadius:12,overflow:'hidden',border:`1.5px solid ${blu}30`,boxShadow:`0 2px 10px ${blu}10`}}>
+            <div style={{background:`linear-gradient(135deg,${blu},#1D4ED8)`,padding:'8px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,color:'#fff'}}>📌 اشتراك إلزامي</div>
+                <div style={{fontSize:7.5,color:'rgba(255,255,255,0.75)',marginTop:1}}>9% موظف + 12% جهة العمل</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:3,background:'rgba(255,255,255,0.15)',borderRadius:7,padding:'3px 6px'}}>
+                <span style={{fontSize:7.5,color:'rgba(255,255,255,0.85)'}}>زيادة:</span>
+                <input type="number" value={mandRaise} onChange={e=>setMandRaise(Math.max(0,Math.min(50,+e.target.value)))} style={{width:30,padding:'1px 3px',borderRadius:5,border:'none',fontSize:9,textAlign:'center',fontFamily:'inherit',background:'rgba(255,255,255,0.25)',color:'#fff'}}/>
+                <span style={{fontSize:7.5,color:'rgba(255,255,255,0.85)'}}>%</span>
               </div>
             </div>
-            <table style={{width:'100%',fontSize:8,borderCollapse:'collapse'}}>
-              <thead><tr>{['السنة','الأجر الخاضع','حصة الموظف','إجمالي الاشتراك'].map(h=><th key={h} style={{padding:'4px 2px',textAlign:'right',color:blu,fontWeight:700,borderBottom:`1px solid ${blu}25`}}>{h}</th>)}</tr></thead>
-              <tbody>{mandRows.map(r=><tr key={r.y} style={{borderBottom:`1px solid ${brd2}`}}><td style={{padding:'4px 2px',fontWeight:600,color:txt}}>{r.y}</td><td style={{padding:'4px 2px',color:txt2}}>{fI(r.sal)}</td><td style={{padding:'4px 2px',color:blu,fontWeight:600}}>{fI(r.emp)}</td><td style={{padding:'4px 2px',fontWeight:700,color:gold}}>{fI(r.tot)}</td></tr>)}</tbody>
-            </table>
+            <div style={{background:bluL,padding:'0 0 6px'}}>
+              <table style={{width:'100%',fontSize:8,borderCollapse:'collapse'}}>
+                <thead>
+                  <tr style={{background:`${blu}10`}}>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:blu,fontWeight:700,borderBottom:`1px solid ${blu}25`,fontSize:7.5}}>السنة</th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:txt2,fontWeight:600,borderBottom:`1px solid ${blu}25`,fontSize:7.5}}>الأجر</th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:blu,fontWeight:800,borderBottom:`1px solid ${blu}25`,fontSize:8}}>موظف/شهر<br/><span style={{fontSize:6.5,fontWeight:500,color:txt2}}>(9%)</span></th>
+                    <th style={{padding:'5px 5px',textAlign:'right',color:gold2,fontWeight:700,borderBottom:`1px solid ${blu}25`,fontSize:7.5}}>إجمالي/شهر<br/><span style={{fontSize:6.5,fontWeight:400,color:txt2}}>(21%)</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mandRows.map((r,i)=>(
+                    <tr key={r.y} style={{background:i%2===0?'rgba(255,255,255,0.6)':'transparent',borderBottom:`1px solid ${brd2}`}}>
+                      <td style={{padding:'4px 5px',fontWeight:600,color:txt,fontSize:8}}>{r.y}</td>
+                      <td style={{padding:'4px 5px',color:txt2,fontSize:7.5}}>{fI(r.sal)}</td>
+                      <td style={{padding:'4px 5px',fontWeight:900,color:blu,fontSize:9.5}}>{fI(r.emp)}</td>
+                      <td style={{padding:'4px 5px',fontWeight:700,color:gold2,fontSize:8}}>{fI(r.tot)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:`${blu}12`,borderTop:`1.5px solid ${blu}30`}}>
+                    <td colSpan={2} style={{padding:'5px 5px',fontWeight:800,color:blu,fontSize:8.5}}>إجمالي الموظف</td>
+                    <td style={{padding:'5px 5px',fontWeight:900,color:blu,fontSize:9}}>{fI(Math.round(mandRows.reduce((s,r)=>s+r.emp*12,0)))}</td>
+                    <td style={{padding:'5px 5px',fontWeight:900,color:gold2,fontSize:9}}>{fI(Math.round(mandRows.reduce((s,r)=>s+r.tot*12,0)))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
+
         </div>
 
         {/* التكلفة على المشترك والمعاش الناتج */}
@@ -1480,7 +1644,7 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           const penPts=[0,12,24,36,48,60,84,120].map(x=>{
             let tot=BASE,rem=x;
             for(const r of mandRows){const take=Math.min(rem,12);tot+=take*r.sal/480;rem-=take;if(rem<=0)break;}
-            return{x,pen:Math.min(Math.round(tot),45000)};
+            return{x,pen:Math.round(tot)};
           });
 
           const ROWS=[12,24,60,120];
@@ -1498,71 +1662,9 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
           const maxC=Math.max(...barData.flatMap(d=>[d.opt,d.mand]),1);
           const abbr=v=>v>=1000?`${(v/1000).toFixed(0)}K`:String(v);
 
-          // أبعاد الرسم
-          const W=270,H=130,PL=34,PR=8,PT=16,PB=26;
-          const cw=W-PL-PR,ch=H-PT-PB;
-          const nG=barData.length,gW=cw/nG;
-          const bW=Math.min(gW*0.34,20),gap=3;
-          const gx=i=>PL+i*gW+gW/2; // مركز المجموعة
-          const bh=v=>(v/maxC)*ch;
-          const by=v=>PT+ch-bh(v);
-          const yTicks=[0,maxC*0.5,maxC];
-
           return(
             <div style={{...crd,marginBottom:12}}>
               <SH icon="📊" label="التكلفة على المشترك مقابل المعاش الناتج" color={gold}/>
-
-              {/* المفتاح */}
-              <div style={{display:'flex',gap:14,marginBottom:10,justifyContent:'center',flexWrap:'wrap'}}>
-                {[{clr:pur,lb:'اشتراك اختياري'},{clr:blu,lb:'اشتراك إلزامي (حصة الموظف)'}].map(l=>(
-                  <div key={l.lb} style={{display:'flex',alignItems:'center',gap:5,fontSize:9,color:txt2}}>
-                    <div style={{width:10,height:10,borderRadius:3,background:l.clr,flexShrink:0}}/>
-                    {l.lb}
-                  </div>
-                ))}
-              </div>
-
-              {/* الرسم البياني — أعمدة */}
-              <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
-                {/* شبكة أفقية */}
-                {yTicks.map((v,i)=>(
-                  <g key={i}>
-                    <line x1={PL} y1={by(v)} x2={W-PR} y2={by(v)} stroke={brd} strokeWidth="0.5" strokeDasharray="3,4"/>
-                    <text x={PL-3} y={by(v)+3} textAnchor="end" fontSize="6" fill={txt2} fontFamily="Tajawal,sans-serif">{abbr(v)}</text>
-                  </g>
-                ))}
-                {/* محور X */}
-                <line x1={PL} y1={PT+ch} x2={W-PR} y2={PT+ch} stroke={brd} strokeWidth="0.7"/>
-
-                {/* الأعمدة */}
-                {barData.map((d,i)=>{
-                  const cx=gx(i);
-                  const ox=cx-gap/2-bW; // عمود الاختياري (يمين المركز)
-                  const mx=cx+gap/2;    // عمود الإلزامي (يسار المركز)
-                  const oh=bh(d.opt),mh=bh(d.mand);
-                  const R=3;
-                  const rRect=(x,y,w,h,r)=>h<r*2?`M${x+r},${y} h${w-2*r} a${r},${r} 0 0 1 ${r},${r} v${h-r} h${-w} v${-(h-r)} a${r},${r} 0 0 1 ${r},${-r} Z`:`M${x+r},${y} h${w-2*r} a${r},${r} 0 0 1 ${r},${r} v${h-2*r} a0,0 0 0 0 0,0 h${-w} a0,0 0 0 0 0,0 v${-(h-2*r)} a${r},${r} 0 0 1 ${r},${-r} Z`;
-                  return(
-                    <g key={d.x}>
-                      {/* عمود الاختياري */}
-                      {oh>0&&<path d={rRect(ox,by(d.opt),bW,oh,R)} fill={pur} opacity="0.85"/>}
-                      {/* عمود الإلزامي */}
-                      {mh>0&&<path d={rRect(mx,by(d.mand),bW,mh,R)} fill={blu} opacity="0.85"/>}
-                      {/* قيم أعلى الأعمدة */}
-                      {oh>8&&<text x={ox+bW/2} y={by(d.opt)-2} textAnchor="middle" fontSize="5.5" fill={pur} fontWeight="600" fontFamily="Tajawal,sans-serif">{abbr(d.opt)}</text>}
-                      {mh>8&&<text x={mx+bW/2} y={by(d.mand)-2} textAnchor="middle" fontSize="5.5" fill={blu} fontWeight="600" fontFamily="Tajawal,sans-serif">{abbr(d.mand)}</text>}
-                      {/* المعاش فوق المجموعة */}
-                      <text x={cx+bW/2} y={PT-4} textAnchor="middle" fontSize="6" fill={gold2} fontWeight="700" fontFamily="Tajawal,sans-serif">{fI(d.pen)}</text>
-                      {/* تسمية المجموعة */}
-                      <text x={cx+bW/2} y={H-8} textAnchor="middle" fontSize="6.5" fill={txt2} fontFamily="Tajawal,sans-serif">{d.lbl}</text>
-                    </g>
-                  );
-                })}
-
-                {/* تسمية المعاش */}
-                <text x={W-PR} y={PT-4} textAnchor="end" fontSize="6" fill={gold} fontFamily="Tajawal,sans-serif">المعاش ↑</text>
-              </svg>
-
               {/* الجدول */}
               <div style={{marginTop:10,borderRadius:12,overflow:'hidden',border:`1px solid ${brd}`}}>
                 <table style={{width:'100%',fontSize:8,borderCollapse:'collapse'}}>
@@ -1584,6 +1686,108 @@ ${pen.actMode?`<div class="c" style="background:#F5F3FF;border-color:#7C3AED;mar
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── ملخص التكلفة الشاملة ── */}
+        {(()=>{
+          const totalOptCost=Math.round(optRows.reduce((s,r)=>s+r.b*0.18*12,0));
+          const addPenVol=Math.round(optRows.reduce((s,r)=>s+12*r.b/480,0));
+          const today2=new Date();
+          const earlyNeedNow=Math.max(0,ri.eR-ps.tM);
+          const earlyDateISO2=earlyNeedNow===0?today2.toISOString().split('T')[0]:new Date(today2.getFullYear(),today2.getMonth()+earlyNeedNow,today2.getDate()).toISOString().split('T')[0];
+          const planMonths=info.rd&&earlyDateISO2?Math.max(0,Math.round((new Date(info.rd)-new Date(earlyDateISO2))/864e5/30.44)):optRows.length*12;
+          const opportunityCost=Math.round(pen.f*planMonths);
+          const totalRealCost=totalOptCost+opportunityCost;
+          const penAfter=pen.f+addPenVol;
+          const breakEvenM=addPenVol>0?Math.ceil(totalRealCost/addPenVol):null;
+          if(!optRows.length)return null;
+          return(
+            <div style={{borderRadius:16,overflow:'hidden',border:`1.5px solid ${gold}40`,marginBottom:12,boxShadow:`0 4px 20px ${gold}12`}}>
+              {/* العنوان */}
+              <div style={{background:`linear-gradient(135deg,${gold2},${gold})`,padding:'12px 14px'}}>
+                <div style={{fontSize:13,fontWeight:900,color:'#fff',letterSpacing:-0.2}}>💰 ملخص التكلفة الشاملة لخطة التحسين</div>
+                <div style={{fontSize:8.5,color:'rgba(255,255,255,0.75)',marginTop:2}}>تكلفة الاشتراك + الفرصة الضائعة + نقطة التعادل</div>
+              </div>
+
+              <div style={{background:bg2,padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
+
+                {/* البند 1: تكلفة الاشتراك الاختياري */}
+                <div style={{background:purL,borderRadius:12,padding:'10px 12px',border:`1px solid ${pur}25`}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <div style={{fontSize:10,fontWeight:700,color:pur}}>📊 إجمالي الاشتراك الاختياري</div>
+                    <div style={{fontSize:8,color:txt2}}>طوال {optRows.length} سنة</div>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                    <div style={{fontSize:8,color:txt2,lineHeight:1.8}}>
+                      {optRows.length} سنة × متوسط {fI(Math.round(optRows.reduce((s,r)=>s+r.opt,0)/optRows.length))} ريال/شهر × 12
+                    </div>
+                    <div style={{fontSize:17,fontWeight:900,color:pur}}>{fI(totalOptCost)} <span style={{fontSize:9,fontWeight:500}}>ر.س</span></div>
+                  </div>
+                </div>
+
+                {/* البند 2: الفرصة الضائعة */}
+                {planMonths>0&&pen.f>0&&(
+                  <div style={{background:redL,borderRadius:12,padding:'10px 12px',border:`1px solid ${red}25`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                      <div style={{fontSize:10,fontWeight:700,color:red}}>⏳ تكلفة الفرصة الضائعة</div>
+                      <div style={{fontSize:8,color:txt2,background:'rgba(239,68,68,0.1)',borderRadius:6,padding:'2px 6px'}}>معاش تقاعدي فائت</div>
+                    </div>
+                    <div style={{fontSize:8.5,color:'#6B1010',lineHeight:2,marginBottom:6}}>
+                      أنت مؤهل للتقاعد المبكر براتب <strong style={{color:red}}>{fmt(pen.f)} ر.س/شهر</strong> — لكنك تؤجل التقاعد {fI(planMonths)} شهر لتحسين المعاش. هذا المعاش يُعدّ تكلفة فعلية لخطة التحسين.
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr auto 1fr',alignItems:'center',gap:4,background:'rgba(239,68,68,0.06)',borderRadius:8,padding:'7px 10px',border:`1px solid ${red}15`}}>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:7,color:txt2}}>معاش المبكر</div>
+                        <div style={{fontSize:11,fontWeight:800,color:red}}>{fmt(pen.f)}</div>
+                      </div>
+                      <div style={{fontSize:14,color:txt2,textAlign:'center'}}>×</div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:7,color:txt2}}>أشهر التأجيل</div>
+                        <div style={{fontSize:11,fontWeight:800,color:txt}}>{fI(planMonths)}</div>
+                      </div>
+                      <div style={{fontSize:14,color:txt2,textAlign:'center'}}>=</div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:7,color:red}}>المعاش الضائع</div>
+                        <div style={{fontSize:11,fontWeight:900,color:red}}>{fI(opportunityCost)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* البند 3: الإجمالي الحقيقي */}
+                <div style={{background:`linear-gradient(135deg,${gold}12,${pur}08)`,borderRadius:12,padding:'12px 14px',border:`1.5px solid ${gold}35`}}>
+                  <div style={{fontSize:10,color:txt2,marginBottom:6,fontWeight:600}}>إجمالي التكلفة الفعلية الشاملة</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                    <div style={{fontSize:8,color:txt2}}>
+                      {fI(totalOptCost)} (اشتراك){planMonths>0&&pen.f>0?` + ${fI(opportunityCost)} (فرصة ضائعة)`:''}
+                    </div>
+                    <div style={{fontSize:20,fontWeight:900,color:gold2}}>{fI(totalRealCost)} <span style={{fontSize:10,fontWeight:500}}>ر.س</span></div>
+                  </div>
+                </div>
+
+                {/* البند 4: الزيادة والتعادل */}
+                {addPenVol>0&&(
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                    <div style={{background:grnL,borderRadius:12,padding:'10px 12px',border:`1px solid ${grn}30`,textAlign:'center'}}>
+                      <div style={{fontSize:8,color:txt2,marginBottom:3}}>زيادة المعاش بعد الخطة</div>
+                      <div style={{fontSize:8,color:txt2,marginBottom:4}}>من {fmt(pen.f)} ← إلى</div>
+                      <div style={{fontSize:15,fontWeight:900,color:grn}}>{fmt(penAfter)}</div>
+                      <div style={{fontSize:8,color:grn,fontWeight:700,marginTop:2}}>+{fmt(addPenVol)} ر.س / شهر</div>
+                    </div>
+                    {breakEvenM&&(
+                      <div style={{background:goldL,borderRadius:12,padding:'10px 12px',border:`1px solid ${gold}30`,textAlign:'center'}}>
+                        <div style={{fontSize:8,color:txt2,marginBottom:3}}>نقطة التعادل</div>
+                        <div style={{fontSize:8,color:txt2,marginBottom:4}}>تسترد تكلفتك بعد</div>
+                        <div style={{fontSize:15,fontWeight:900,color:gold2}}>{fI(breakEvenM)}</div>
+                        <div style={{fontSize:8,color:gold2,fontWeight:700,marginTop:2}}>شهر ({(breakEvenM/12).toFixed(1)} سنة)</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           );
