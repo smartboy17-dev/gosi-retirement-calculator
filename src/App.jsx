@@ -109,7 +109,7 @@ export default function App(){
     sd.forEach(p=>{if(p.st==='مستبعد')return;const e=p.ac?aEnd:p.ed;const c=mdfCal(p.sd,e,p.cal||'g');const m=c.t;
       if(p.sy==='تقاعد مدني')cM+=m;else if(p.sy==='تقاعد عسكري')wM+=m;
       else if(p.sy==='اشتراك اختياري')vM+=m;else{new Date(p.sd)<new Date('2001-04-25')?oM+=m:nM+=m}
-      if(p.sl>0)lS=p.sl});
+      const ts=(p.sl||0)+(p.hs||0)+(p.cm||0);if(ts>0)lS=ts});
     return{oM,nM,vM,cM,wM,tM:oM+nM+vM+cM+wM,lS,sd};
   },[periods,aEnd]);
 
@@ -127,8 +127,8 @@ export default function App(){
   },[periods]);
 
   const s60=useMemo(()=>{
-    let all=[];ps.sd.filter(p=>p.st!=='مستبعد'&&p.sl>0).forEach(p=>{
-      const c=mdfCal(p.sd,p.ac?aEnd:p.ed,p.cal||'g');for(let i=0;i<c.t;i++)all.push(p.sl)});
+    let all=[];ps.sd.filter(p=>p.st!=='مستبعد'&&((p.sl||0)+(p.hs||0)+(p.cm||0))>0).forEach(p=>{
+      const c=mdfCal(p.sd,p.ac?aEnd:p.ed,p.cal||'g');const psl=(p.sl||0)+(p.hs||0)+(p.cm||0);for(let i=0;i<c.t;i++)all.push(psl)});
     return all.length>=60?all[all.length-60]:(all[0]||0);
   },[ps,aEnd]);
 
@@ -189,7 +189,7 @@ export default function App(){
   },[ps,r150,deps,aEnd,tf,mergedPeriods,transferProgram,periods,avg]);
 
   const vOpts=useMemo(()=>allowedBK(ps.lS),[ps.lS]);
-  const addP=()=>setPeriods(p=>[...p,{id:Date.now(),emp:'',sd:'',ed:'',ac:false,sl:0,sy:SYS[0],st:'منتهي',cal:'g',sdH:'',edH:''}]);
+  const addP=()=>setPeriods(p=>[...p,{id:Date.now(),emp:'',sd:'',ed:'',ac:false,sl:0,hs:0,cm:0,sy:SYS[0],st:'منتهي',cal:'g',sdH:'',edH:''}]);
   const upP=(id,f,v)=>setPeriods(pr=>pr.map(p=>p.id===id?{...p,[f]:v}:p));
   const toggleCal=(id,nc)=>setPeriods(pr=>pr.map(p=>p.id!==id?p:{...p,cal:nc,sdH:nc==='h'?isoToHijriStr(p.sd):'',edH:nc==='h'?isoToHijriStr(p.ed):''}));
   const handleHijriDate=(id,field,val)=>setPeriods(pr=>pr.map(p=>{if(p.id!==id)return p;const hf=field==='sd'?'sdH':'edH';const iso=hijriStrToIso(val);return{...p,[hf]:val,...(iso?{[field]:iso}:{})}}));
@@ -804,18 +804,38 @@ ${tf.has&&!pen.actMode?`<div class="sec">🔄 تبادل المنافع — نظ
               على رأس العمل حتى التقاعد
             </label>
 
-            <div style={{display:'grid',gridTemplateColumns:`1fr 1fr${p.ac?'':' 1fr'}`,gap:5}}>
+            {/* ── الأجر: أساسي + بدل سكن + عمولات ── */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:5,marginBottom:5}}>
               <div>
-                <div style={{fontSize:10,color:txt2,marginBottom:3}}>الأجر (ر.س)</div>
-                <input type="number" value={p.sl||''} onChange={e=>upP(p.id,'sl',+e.target.value)} style={{...inp,direction:'ltr',textAlign:'center',padding:'7px 8px',fontSize:12}}/>
+                <div style={{fontSize:9,color:txt2,marginBottom:3,fontWeight:600}}>الأجر (ر.س)</div>
+                <input type="number" value={p.sl||''} onChange={e=>upP(p.id,'sl',+e.target.value)} placeholder="0" style={{...inp,direction:'ltr',textAlign:'center',padding:'6px 6px',fontSize:12}}/>
               </div>
               <div>
-                <div style={{fontSize:10,color:txt2,marginBottom:3}}>النظام</div>
-                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:9,appearance:'none',WebkitAppearance:'none',padding:'7px 8px'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
+                <div style={{fontSize:9,color:txt2,marginBottom:3,fontWeight:600}}>بدل السكن</div>
+                <input type="number" value={p.hs||''} onChange={e=>upP(p.id,'hs',+e.target.value)} placeholder="0" style={{...inp,direction:'ltr',textAlign:'center',padding:'6px 6px',fontSize:12}}/>
+              </div>
+              <div>
+                <div style={{fontSize:9,color:txt2,marginBottom:3,fontWeight:600}}>العمولات</div>
+                <input type="number" value={p.cm||''} onChange={e=>upP(p.id,'cm',+e.target.value)} placeholder="0" style={{...inp,direction:'ltr',textAlign:'center',padding:'6px 6px',fontSize:12}}/>
+              </div>
+            </div>
+
+            {/* إجمالي الأجر */}
+            {((p.sl||0)+(p.hs||0)+(p.cm||0))>0&&(
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:`${sc}12`,borderRadius:8,padding:'5px 10px',marginBottom:5,border:`1px solid ${sc}25`}}>
+                <span style={{fontSize:9,color:txt2,fontWeight:600}}>إجمالي الأجر</span>
+                <span style={{fontSize:13,fontWeight:900,color:sc}}>{fI((p.sl||0)+(p.hs||0)+(p.cm||0))} <span style={{fontSize:8,fontWeight:500}}>ر.س</span></span>
+              </div>
+            )}
+
+            <div style={{display:'grid',gridTemplateColumns:`1fr 1fr${p.ac?'':' 1fr'}`,gap:5,marginBottom:0}}>
+              <div>
+                <div style={{fontSize:9,color:txt2,marginBottom:3,fontWeight:600}}>النظام</div>
+                <select value={p.sy} onChange={e=>upP(p.id,'sy',e.target.value)} style={{...inp,fontSize:9,appearance:'none',WebkitAppearance:'none',padding:'6px 8px'}}>{SYS.map(s=><option key={s}>{s}</option>)}</select>
               </div>
               {!p.ac&&<div>
-                <div style={{fontSize:10,color:txt2,marginBottom:3}}>الحالة</div>
-                <select value={p.st} onChange={e=>upP(p.id,'st',e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none',padding:'7px 8px',fontSize:9}}><option>نشط</option><option>منتهي</option><option>مستبعد</option></select>
+                <div style={{fontSize:9,color:txt2,marginBottom:3,fontWeight:600}}>الحالة</div>
+                <select value={p.st} onChange={e=>upP(p.id,'st',e.target.value)} style={{...inp,appearance:'none',WebkitAppearance:'none',padding:'6px 8px',fontSize:9}}><option>نشط</option><option>منتهي</option><option>مستبعد</option></select>
               </div>}
             </div>
 
